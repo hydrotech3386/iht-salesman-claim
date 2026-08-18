@@ -310,7 +310,14 @@ table.mil td{height:30px;vertical-align:top}
   </div>
 
   <div class="card">
-    <h2>Monthly toll invoice / statement</h2>
+    <h2>Touch 'n Go statement</h2>
+    <label class="btn" style="display:block;text-align:center">📷 Scan Touch 'n Go statement<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="scanTng(this)"></label>
+    <div class="hint" style="margin-top:8px">Reads every toll crossing and fills in the exact
+      charge on the trip for that date. Reloads and top-ups are ignored.</div>
+  </div>
+
+  <div class="card">
+    <h2>Cross-check</h2>
     <div class="hint" style="margin-bottom:10px">Photograph the monthly toll statement and the AI
       reads the total, or just key it in below.</div>
     <div class="f" style="margin-top:10px">
@@ -412,6 +419,8 @@ const LIST_ROOT = 'salesmanLists';    // shared customer / area master lists
 let fb = { ready:false, db:null, users:null };
 let session = null;                   // {uid,name,email,role,salesman}
 let authFail = null;                  // why anonymous auth failed, if it did
+let connected = false;                // RTDB socket state
+let pushErr = null;                   // last write failure, if any
 let viewUid = null;                   // whose claims are on screen (management)
 let readOnly = false;
 
@@ -506,7 +515,13 @@ function initFirebase(){
     fb.db      = firebase.database();
     fb.users   = fb.db.ref('invoiceUsers');
     fb.ready   = true;
-    fb.db.ref('.info/connected').on('value', s=>setSync(s.val()?'ok':'off'));
+    fb.db.ref('.info/connected').on('value', s=>{
+      connected = !!s.val();
+      /* A write error outranks the connection light — being online but silently
+         not saving is the dangerous state, so never paint that green. */
+      if(pushErr) setSync('err','Not saving — '+pushErr);
+      else setSync(connected?'ok':'off');
+    });
   }catch(e){ console.error('firebase init failed', e); setSync('err'); }
 }
 function setSync(state,msg){
@@ -651,9 +666,20 @@ function pushCloud(){
   if(!fb.ready||!session||readOnly) return;
   clearTimeout(cloudT);
   cloudT=setTimeout(()=>{
-    dataRef(session.uid).set({ profile:S.profile, months:S.months, updated:Date.now() })
-      .then(()=>setSync('ok'))
-      .catch(e=>{ console.warn('push failed',e); setSync('off'); });
+    /* Firebase rejects the whole write if any value is `undefined`, which used
+       to show up as a permanent "Offline" with no clue why. A JSON round-trip
+       drops undefined keys so one stray field can't block the whole claim. */
+    let payload;
+    try{
+      payload = JSON.parse(JSON.stringify({ profile:S.profile, months:S.months, updated:Date.now() }));
+    }catch(e){ setSync('err','Could not save — bad data'); return; }
+    dataRef(session.uid).set(payload)
+      .then(()=>{ pushErr=null; setSync(connected?'ok':'off'); })
+      .catch(e=>{
+        pushErr=(e&&(e.code||e.message))||'write failed';
+        console.warn('push failed',e);
+        setSync('err','Not saving — '+pushErr);
+      });
   },600);
 }
 function watchCloud(uid){
@@ -768,7 +794,13 @@ function fillMonths(){
 /* ---------------- totals ---------------- */
 const num = v => Number(v)||0;
 function tripKm(t){ const d=num(t.endKm)-num(t.startKm); return d>0?d:0; }
-function tollOf(t){ return t.toll ? num(t.tollRate)*(num(t.tollWay)||1) : 0; }
+function tollOf(t){
+  if(!t.toll) return 0;
+  /* A figure read off the Touch 'n Go statement is what was actually paid, so
+     it overrides the salesman's one-way estimate. */
+  if(t.tollActual!==undefined && t.tollActual!=='' && t.tollActual!==null) return num(t.tollActual);
+  return num(t.tollRate)*(num(t.tollWay)||1);
+}
 const sumBy=(a,f)=>asArray(a).reduce((s,x)=>s+num(f(x)),0);
 
 function totals(){
@@ -1115,6 +1147,132 @@ function commitReview(cat){
   toast(`${n} item${n>1?'s':''} added — photos discarded`);
 }
 
+/* =====================================================================
+   TOUCH 'N GO STATEMENT
+   The statement lists every toll crossing with its exact charge, so it is a
+   better source than the salesman guessing a one-way rate. Charges are
+   matched onto the toll trips already recorded, by date.
+   ===================================================================== */
+const TNG_SCHEMA = {
+  type:'object',
+  properties:{
+    transactions:{ type:'array', items:{ type:'object', properties:{
+      date:{type:'string', description:'Date of the crossing as YYYY-MM-DD.'},
+      entry:{type:'string', description:'Entry Location exactly as printed.'},
+      exit:{type:'string', description:'Exit Location exactly as printed.'},
+      amount:{type:'number', description:'Trans. Amount in ringgit.'},
+      confident:{type:'boolean', description:'False if the date or amount is unclear.'}
+    }, required:['date','entry','exit','amount','confident'], additionalProperties:false } },
+    note:{ type:'string', description:'Short remark if rows were skipped or unreadable; "" otherwise.' }
+  },
+  required:['transactions','note'], additionalProperties:false
+};
+const TNG_PROMPT =
+`This is a Touch 'n Go card TRANSACTION HISTORY statement belonging to a Malaysian salesman.
+The photo may be rotated ninety degrees or upside down — read it in whatever orientation it is in.
+
+Return one entry for each TOLL CROSSING only.
+
+Include a row only when its "Trans. Type" is "Usage" AND its "Sector" is "TOLL".
+
+EXCLUDE, and never return:
+- Reload rows: "Trans. Type" of "Reload", "Sector" of "INTERNET RELOAD", or an Entry/Exit location like "OTA-TNGD" or "TD_TNG DIGITAL (M) SDN BHD". These are top-ups of the card, not travel, and claiming them would be claiming money that was never spent on tolls.
+- Any summary line at the top of the statement such as "Usage Amount", "Reload Amount", "No. of Usage" or "No. of Reload". Those are totals for the whole period, not individual crossings.
+
+For each toll crossing:
+- "amount" is the "Trans. Amount (RM)" column — the charge for that crossing. Do NOT use the "Balance (RM)" column, which is the money left on the card and is a much larger number. If a value is highlighted or circled, it is still read from the Trans. Amount column.
+- "date" is the date of the "Exit Date & Time" as YYYY-MM-DD. The statement prints dates like "Jul 16, 2026" — that is 2026-07-16. Ignore the "Posted Date" column, which is when the charge settled and is often a later date.
+- "entry" and "exit" are the Entry Location and Exit Location exactly as printed, e.g. "PLUS - KUALA KANGSAR".
+- Set "confident" to false if the amount or date is blurred, cut off, or ambiguous.
+
+Read only what is printed. Never invent a crossing or an amount. If nothing readable is present, return an empty list and explain in "note".`;
+
+async function scanTng(inp){
+  const added = await takeShots(inp);
+  if(!added.length) return;
+  if(!aiKey()){ dropShots(); toast('AI is not set up — key the toll charges in per trip'); return; }
+  openScanning(added.length);
+  try{
+    const parsed = await askClaude(added, TNG_PROMPT, TNG_SCHEMA, 8000);
+    const rows=(parsed.transactions||[])
+      .filter(r=>Number(r.amount)>0 && /^\d{4}-\d{2}-\d{2}$/.test(r.date||''))
+      .sort((a,b)=>a.date.localeCompare(b.date));
+    if(!rows.length){
+      dropShots(); closeSheet();
+      toast(parsed.note ? 'Nothing usable — '+parsed.note : 'No toll crossings found');
+      return;
+    }
+    openTngReview(rows, parsed.note);
+  }catch(err){
+    console.error(err); dropShots(); closeSheet();
+    toast('Could not read the statement: '+err.message);
+  }
+}
+
+/* Group the crossings by date and line them up against the trips already
+   recorded, so the salesman can see what matched before anything is applied. */
+function tngGroups(rows){
+  const trips=M().trips.filter(t=>t.toll);
+  const by={};
+  rows.forEach(r=>{ (by[r.date]=by[r.date]||[]).push(r); });
+  return Object.keys(by).sort().map(date=>({
+    date,
+    rows: by[date],
+    total: by[date].reduce((s,r)=>s+Number(r.amount||0),0),
+    trip: trips.find(t=>t.date===date) || null
+  }));
+}
+function openTngReview(rows, note){
+  window._tng = tngGroups(rows);
+  const matched = window._tng.filter(g=>g.trip).length;
+  const grand = window._tng.reduce((s,g)=>s+g.total,0);
+  openSheet(`
+    <h3>Toll crossings<button onclick="cancelReview()">×</button></h3>
+    ${note?`<div class="roflag" style="display:block">${esc(note)}</div>`:''}
+    <div class="tot"><span>${rows.length} crossing${rows.length>1?'s':''} read</span>
+      <span class="n">${rm(grand)}</span></div>
+    <div class="hint" style="margin-bottom:10px">${matched} of ${window._tng.length} day(s)
+      match a trip you recorded. Matched days get their exact charge; the rest need a
+      trip on that date before they can be claimed.</div>
+    <div id="tngRows"></div>
+    <div class="btns" style="margin-top:6px">
+      <button class="btn gry" onclick="cancelReview()">Cancel</button>
+      <button class="btn" onclick="applyTng()">Apply to trips</button>
+    </div>
+    <div class="hint" style="margin-top:10px">Reloads and top-ups are ignored —
+      only actual toll crossings are claimed. The photo is deleted when you apply.</div>`);
+  drawTng();
+}
+function drawTng(){
+  const box=$('#tngRows'); if(!box) return;
+  box.innerHTML=window._tng.map(g=>`
+    <div class="item" style="${g.trip?'':'border-color:#f0c9a0;background:#fffdf8'}">
+      <div class="top">
+        <div class="g">
+          <div class="t1">${esc(dayLabel(g.date))}</div>
+          ${g.rows.map(r=>`<div class="t2">${esc(r.entry)} → ${esc(r.exit)} · ${rm(r.amount)}${r.confident?'':' <b style="color:var(--warn)">⚠ check</b>'}</div>`).join('')}
+          <div class="t2" style="margin-top:4px">${g.trip
+            ? '<span class="tag">MATCHED</span>'+esc(g.trip.area||'')+' — '+esc(g.trip.tollFrom||'?')+' → '+esc(g.trip.tollTo||'?')
+            : '<b style="color:var(--warn)">No toll trip recorded on this date</b>'}</div>
+        </div>
+        <div class="amt">${rm(g.total)}</div>
+      </div>
+    </div>`).join('');
+}
+function applyTng(){
+  const m=M();
+  let applied=0, skipped=0;
+  window._tng.forEach(g=>{
+    if(!g.trip){ skipped++; return; }
+    const t=m.trips.find(x=>x.id===g.trip.id);
+    if(t){ t.tollActual=g.total; applied++; }
+  });
+  /* The statement total is the natural cross-check figure for the toll box. */
+  m.tollInvAmt = String(window._tng.reduce((s,g)=>s+g.total,0).toFixed(2));
+  dropShots(); save(); closeSheet(); renderAll();
+  toast(applied+' day(s) updated'+(skipped?', '+skipped+' had no matching trip':''));
+}
+
 const ODO_SCHEMA = {
   type:'object',
   properties:{
@@ -1253,9 +1411,10 @@ function renderToll(){
           <div class="amt">${rm(tollOf(x))}</div>
         </div>
         <div class="row" style="margin-top:8px;align-items:flex-end">
-          <div class="f" style="margin:0"><label>One-way charge (RM)</label>
-            <input type="number" step="0.01" inputmode="decimal" value="${esc(x.tollRate)}"
-              onchange="setTollRate('${x.id}',this.value)"></div>
+          <div class="f" style="margin:0"><label>${x.tollActual!==undefined&&x.tollActual!==''?'Actual charge from statement (RM)':'One-way charge (RM)'}</label>
+            <input type="number" step="0.01" inputmode="decimal"
+              value="${esc(x.tollActual!==undefined&&x.tollActual!==''?x.tollActual:x.tollRate)}"
+              onchange="setTollAmt('${x.id}',this.value)"></div>
           <div style="flex:0 0 auto"><button class="btn sm gry" onclick="editTrip('${x.id}')">✎ Trip</button></div>
         </div>
       </div>`).join('');
@@ -1267,9 +1426,12 @@ function renderToll(){
        ${Math.abs(diff)<0.01 ? '✓ Matches the invoice total.'
         : 'Difference of '+rm(Math.abs(diff))+' — invoice is '+(diff>0?'higher':'lower')+' than the trips claimed.'}</div>`;
 }
-function setTollRate(id,v){
+function setTollAmt(id,v){
   const t=M().trips.find(x=>x.id===id); if(!t) return;
-  t.tollRate=v; save(); renderAll();
+  /* Once a statement figure exists the box edits that; otherwise the estimate. */
+  if(t.tollActual!==undefined && t.tollActual!=='') t.tollActual=v;
+  else t.tollRate=v;
+  save(); renderAll();
 }
 $('#tollInvAmt').addEventListener('input',e=>{ M().tollInvAmt=e.target.value; save(); renderToll(); });
 
