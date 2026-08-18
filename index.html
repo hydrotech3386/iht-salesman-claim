@@ -1612,25 +1612,34 @@ async function startApp(){
 
 /* Management sees every salesman's claim, read-only — they approve on the
    printed form, so nothing here should let them edit someone's numbers. */
+/* Management can review anyone — but they file their own claim too, so their
+   own is always first and always editable. Only other people's are read-only. */
 async function buildStaffPicker(){
   const sel=$('#fStaff');
   sel.style.display='';
   $('#fName').style.display='none';
-  let users={};
-  try{ users=(await fb.users.once('value')).val()||{}; }catch(e){}
-  let claims={};
+  let users={}, claims={};
+  try{ users =(await fb.users.once('value')).val()||{}; }catch(e){}
   try{ claims=(await fb.db.ref(DB_ROOT).once('value')).val()||{}; }catch(e){}
-  const opts=Object.keys(claims).map(uid=>{
-    const u=users[uid]||{};
-    return { uid, name:u.salesman||u.name||u.email||uid };
-  }).sort((a,b)=>a.name.localeCompare(b.name));
-  if(!opts.length){ sel.innerHTML='<option>No claims submitted yet</option>'; return; }
-  sel.innerHTML=opts.map(o=>`<option value="${esc(o.uid)}">${esc(o.name)}</option>`).join('');
+  const others=Object.keys(claims)
+    .filter(uid=>uid!==session.uid)
+    .map(uid=>{ const u=users[uid]||{};
+                return { uid, name:u.salesman||u.name||u.email||uid }; })
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  sel.innerHTML =
+    `<option value="${esc(session.uid)}">My claim — ${esc(session.salesman||session.name||'me')}</option>`
+    + others.map(o=>`<option value="${esc(o.uid)}">${esc(o.name)}</option>`).join('');
   sel.onchange=()=>viewStaff(sel.value);
-  viewStaff(opts[0].uid);
+  viewStaff(session.uid);            // land on your own, editable
 }
 function viewStaff(uid){
-  viewUid=uid; readOnly=true;
+  viewUid = uid;
+  readOnly = (uid !== session.uid);  // only someone else's claim is locked
+  if(!readOnly){
+    applyReadOnly();
+    watchCloud(uid);                 // live sync on your own claim
+    return;
+  }
   dataRef(uid).off();
   dataRef(uid).once('value').then(s=>{
     const v=s.val()||{};
@@ -1643,6 +1652,25 @@ function viewStaff(uid){
 /* Driven by a body class, not inline styles, so re-renders (switching month,
    a cloud update landing) can't quietly restore the edit buttons. */
 function applyReadOnly(){ document.body.classList.toggle('ro', readOnly); }
+
+/* A button that does nothing is the worst failure mode to debug remotely —
+   surface anything that throws instead of swallowing it. */
+function showCrash(msg){
+  let el=document.getElementById('crash');
+  if(!el){
+    el=document.createElement('div'); el.id='crash';
+    el.style.cssText='position:fixed;left:8px;right:8px;bottom:78px;z-index:95;background:#c0392b;'
+      +'color:#fff;padding:10px 12px;border-radius:10px;font-size:12.5px;line-height:1.4;'
+      +'box-shadow:0 4px 16px rgba(0,0,0,.3)';
+    el.onclick=()=>el.remove();
+    document.body.appendChild(el);
+  }
+  el.textContent='⚠ '+msg+'  (tap to dismiss)';
+}
+window.addEventListener('error', e=>showCrash((e.message||'Error')+' — line '+(e.lineno||'?')));
+window.addEventListener('unhandledrejection', e=>{
+  const r=e.reason; showCrash('Failed: '+((r&&(r.message||r.code))||r));
+});
 
 function boot(){
   initFirebase();
