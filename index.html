@@ -426,7 +426,27 @@ const esc   = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 let S = { profile:{name:'', rate:0.40, vehicle:''}, months:{}, cur:'' };
 
 function blankMonth(){ return {trips:[],tollInvAmt:'',parking:[],fne:[],others:[]}; }
-function M(){ if(!S.months[S.cur]) S.months[S.cur]=blankMonth(); return S.months[S.cur]; }
+const MONTH_LISTS=['trips','parking','fne','others'];
+
+/* Realtime Database does not store empty arrays, and it hands a sparse array
+   back as an object keyed by index. Either way a month can come back from the
+   cloud missing its lists, so normalise every month before anything touches it. */
+function asArray(v){
+  if(Array.isArray(v)) return v.filter(x=>x!=null);
+  if(v && typeof v==='object') return Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]).filter(x=>x!=null);
+  return [];
+}
+function normMonth(m){
+  if(!m || typeof m!=='object') m=blankMonth();
+  MONTH_LISTS.forEach(k=>{ m[k]=asArray(m[k]); });
+  if(typeof m.tollInvAmt!=='string' && typeof m.tollInvAmt!=='number') m.tollInvAmt='';
+  return m;
+}
+function normAll(){
+  if(!S.months || typeof S.months!=='object') S.months={};
+  Object.keys(S.months).forEach(k=>{ S.months[k]=normMonth(S.months[k]); });
+}
+function M(){ return S.months[S.cur]=normMonth(S.months[S.cur]); }
 
 function load(){
   S={ profile:{name:'',rate:0.40,vehicle:''}, months:{}, cur:S.cur||'' };
@@ -443,6 +463,7 @@ function load(){
 /* v1 stored one comma-separated "customers" string plus a single trip-level
    "remarks". Each customer now carries its own reason for the visit. */
 function migrate(){
+  normAll();
   Object.values(S.months||{}).forEach(m=>{
     (m.trips||[]).forEach(t=>{
       if(t.visits) return;
@@ -748,7 +769,7 @@ function fillMonths(){
 const num = v => Number(v)||0;
 function tripKm(t){ const d=num(t.endKm)-num(t.startKm); return d>0?d:0; }
 function tollOf(t){ return t.toll ? num(t.tollRate)*(num(t.tollWay)||1) : 0; }
-const sumBy=(a,f)=>a.reduce((s,x)=>s+num(f(x)),0);
+const sumBy=(a,f)=>asArray(a).reduce((s,x)=>s+num(f(x)),0);
 
 function totals(){
   const m=M(), rate=num(S.profile.rate)||0.40;
