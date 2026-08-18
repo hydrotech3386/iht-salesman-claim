@@ -1,0 +1,1665 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f4c81">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Claim">
+<title>Hydrotech Salesman Claim</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<style>
+:root{
+  --bg:#eef1f5; --card:#fff; --ink:#16202b; --muted:#6b7785; --line:#d8dee6;
+  --brand:#0f4c81; --brand-d:#0b3a63; --ok:#1a7f4b; --warn:#b3541e; --err:#c0392b;
+  --pad:12px; --r:12px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  color:var(--ink);background:var(--bg);
+  padding-bottom:calc(70px + env(safe-area-inset-bottom));
+}
+h1,h2,h3{margin:0}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+
+/* ---------- header ---------- */
+header{
+  position:sticky;top:0;z-index:40;background:var(--brand);color:#fff;
+  padding:calc(10px + env(safe-area-inset-top)) var(--pad) 10px;
+  box-shadow:0 2px 8px rgba(0,0,0,.18)
+}
+.hrow{display:flex;align-items:center;gap:10px}
+.hrow h1{font-size:16px;font-weight:700;letter-spacing:.2px;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hbtn{background:rgba(255,255,255,.16);border:0;color:#fff;border-radius:8px;
+  padding:7px 10px;font-size:13px}
+.hbtn:active{background:rgba(255,255,255,.3)}
+.hmeta{display:flex;gap:8px;margin-top:8px}
+.hmeta input,.hmeta select{
+  flex:1;min-width:0;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
+  color:#fff;border-radius:8px;padding:7px 9px;font-size:13px
+}
+.hmeta input::placeholder{color:rgba(255,255,255,.7)}
+.hmeta select option{color:#000}
+
+/* ---------- layout ---------- */
+main{padding:var(--pad);max-width:820px;margin:0 auto}
+.tab{display:none}
+.tab.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--pad);margin-bottom:10px}
+.card h2{font-size:14px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);
+  margin-bottom:10px;font-weight:700}
+.row{display:flex;gap:8px}
+.row>*{flex:1;min-width:0}
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 4px}
+.f{margin-bottom:10px}
+input[type=text],input[type=number],input[type=date],input[type=month],select,textarea{
+  width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;background:#fbfcfd
+}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:-1px;background:#fff}
+textarea{resize:vertical;min-height:52px}
+.btn{background:var(--brand);color:#fff;border:0;border-radius:10px;padding:12px 14px;
+  font-weight:600;width:100%}
+.btn:active{background:var(--brand-d)}
+.btn.sec{background:#fff;color:var(--brand);border:1.5px solid var(--brand)}
+.btn.gry{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+.btn.del{background:#fff;color:var(--err);border:1.5px solid #eebcb6}
+.btn.sm{padding:8px 10px;font-size:13px;width:auto}
+.btns{display:flex;gap:8px;margin-top:4px}
+.btns>*{flex:1}
+.chk{display:flex;align-items:center;gap:10px;padding:10px;background:#f5f8fb;
+  border:1px solid var(--line);border-radius:9px;margin-bottom:10px}
+.chk input{width:22px;height:22px;margin:0;accent-color:var(--brand)}
+.chk label{margin:0;font-size:14px;color:var(--ink);font-weight:600}
+.seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{flex:1;border:0;background:#fbfcfd;padding:10px;font-size:13px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--brand);color:#fff}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.vrow{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px}
+.vrow .vn{flex:0 0 20px;text-align:center;font-weight:800;color:var(--muted);
+  font-size:12px;padding-top:12px}
+.vrow .vf{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.vrow .vx{flex:0 0 34px;height:38px;margin-top:2px;border:1px solid var(--line);background:#fff;
+  color:var(--err);border-radius:9px;font-size:18px;line-height:1;padding:0}
+.vrow .vx:disabled{color:#c8cfd8}
+.err{color:var(--err);font-size:12.5px;font-weight:600;margin-top:6px}
+.empty{text-align:center;color:var(--muted);padding:24px 10px;font-size:14px}
+
+/* ---------- list items ---------- */
+.item{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:#fff}
+.item .top{display:flex;gap:8px;align-items:flex-start}
+.item .top .g{flex:1;min-width:0}
+.item .t1{font-weight:700;font-size:14px}
+.item .t2{font-size:12.5px;color:var(--muted);margin-top:2px;word-break:break-word}
+.amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;
+  background:#e6eef6;color:var(--brand);margin-right:5px}
+.tag.toll{background:#fdecd8;color:var(--warn)}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.thumb{width:56px;height:56px;border-radius:8px;border:1px solid var(--line);
+  object-fit:cover;background:#f2f4f7;display:block}
+.pdfic{width:56px;height:56px;border-radius:8px;border:1px solid var(--line);background:#fdeceb;
+  color:#c0392b;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+.iacts{display:flex;gap:6px;margin-top:8px}
+.iacts button{flex:1;padding:7px;font-size:12.5px;border-radius:8px;background:#fff;
+  border:1px solid var(--line);color:var(--ink)}
+.iacts button.d{color:var(--err);border-color:#eebcb6}
+
+/* ---------- totals ---------- */
+.tot{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;
+  background:var(--brand);color:#fff;border-radius:10px;font-weight:700;margin-bottom:10px}
+.tot .n{font-size:17px;font-variant-numeric:tabular-nums}
+.sum{width:100%;border-collapse:collapse;font-size:14px}
+.sum td{padding:8px 4px;border-bottom:1px solid var(--line)}
+.sum td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.sum tr:last-child td{border-bottom:0;font-weight:800;font-size:16px;padding-top:12px}
+
+/* ---------- file picker ---------- */
+.drop{border:2px dashed var(--line);border-radius:10px;padding:16px;text-align:center;
+  color:var(--muted);font-size:13px;background:#fbfcfd}
+.filebar{display:flex;gap:8px}
+.filebar label{flex:1;margin:0;background:#fff;border:1.5px solid var(--brand);color:var(--brand);
+  border-radius:10px;padding:11px;text-align:center;font-size:13.5px;font-weight:700}
+.filebar input[type=file]{display:none}
+
+/* ---------- bottom nav ---------- */
+nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;background:#fff;
+  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)
+}
+nav button{flex:1;border:0;background:none;padding:8px 2px 9px;color:var(--muted);
+  font-size:10.5px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:3px}
+nav button .ic{font-size:18px;line-height:1}
+nav button.on{color:var(--brand)}
+nav button .bdg{position:absolute;transform:translate(14px,-4px);background:var(--brand);color:#fff;
+  border-radius:20px;font-size:9px;padding:1px 5px;min-width:16px}
+
+/* ---------- modal ---------- */
+.mask{position:fixed;inset:0;background:rgba(10,20,30,.55);z-index:60;display:none;
+  align-items:flex-end;justify-content:center}
+.mask.on{display:flex}
+.sheet{background:var(--bg);width:100%;max-width:820px;max-height:92vh;overflow:auto;
+  border-radius:16px 16px 0 0;padding:var(--pad);padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+.sheet h3{font-size:16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.sheet h3 button{background:none;border:0;font-size:22px;color:var(--muted);line-height:1;padding:0 4px}
+@media(min-width:700px){.mask{align-items:center}.sheet{border-radius:16px;max-height:88vh}}
+
+/* ---------- auth overlay ---------- */
+#auth{position:fixed;inset:0;z-index:90;background:linear-gradient(160deg,#0f4c81,#0b3a63);
+  display:flex;align-items:center;justify-content:center;padding:20px}
+#auth.hidden{display:none}
+.authbox{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:380px;
+  box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.authbox h2{font-size:19px;margin-bottom:2px}
+.authbox .sub{font-size:13px;color:var(--muted);margin-bottom:18px}
+.authbox .f{margin-bottom:12px}
+#authErr{font-size:13px;font-weight:600;color:var(--err);min-height:18px;margin-bottom:8px}
+#authErr.wait{color:var(--warn)}
+.syncbar{display:flex;align-items:center;gap:6px;font-size:11px;padding:4px 0 0;color:rgba(255,255,255,.85)}
+.dot{width:7px;height:7px;border-radius:50%;background:#8fdca8;flex:none}
+.dot.off{background:#f0a04b}
+.dot.err{background:#ff8a80}
+
+/* ---------- read-only (management) ---------- */
+body.ro main .btn:not(.keep),
+body.ro .iacts,
+body.ro .filebar,
+body.ro .aibtn,
+body.ro .vrow .vx,
+body.ro #tollTrips input,
+body.ro #tollInvAmt { display:none!important }
+body.ro #tab-out .btn{ display:block!important }   /* printing stays available */
+body.ro input,body.ro select,body.ro textarea{ pointer-events:none;background:#f2f4f7 }
+body.ro #fStaff,body.ro #fMonth,body.ro #tab-out input{ pointer-events:auto;background:'' }
+body.ro .roflag{display:block}
+.roflag{display:none;background:#fdecd8;color:var(--warn);border:1px solid #f0c9a0;
+  border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:700;margin-bottom:10px}
+
+/* ---------- ai button ---------- */
+.aibtn{width:100%;margin-top:8px;padding:11px;border-radius:10px;border:1.5px solid #7d3c98;
+  background:#f6effa;color:#6c3483;font-weight:700;font-size:13.5px}
+.aibtn:disabled{opacity:.55}
+.airesult{margin-top:8px;font-size:12.5px;font-weight:600}
+
+/* ---------- toast ---------- */
+#toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));
+  transform:translateX(-50%) translateY(20px);background:#16202b;color:#fff;padding:10px 16px;
+  border-radius:20px;font-size:13.5px;z-index:80;opacity:0;transition:.25s;pointer-events:none;
+  max-width:90vw;text-align:center}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* =========================================================
+   PRINT / FORM OUTPUT  — mirrors the official templates
+   ========================================================= */
+#out{background:var(--bg)}
+.page{
+  background:#fff;width:100%;max-width:780px;margin:0 auto 14px;padding:16mm 14mm;
+  font-family:Arial,Helvetica,sans-serif;color:#000;font-size:11px;
+  box-shadow:0 2px 10px rgba(0,0,0,.15);border-radius:4px
+}
+.page .co{font-size:15px}
+.page .co b{font-size:11px}
+.bar{background:#3a3a3a;color:#fff;text-align:center;font-weight:bold;font-size:13px;
+  padding:3px 0;margin:6px 0 12px;letter-spacing:.3px}
+.bar.r{text-align:right;padding-right:10px}
+.hdrline{display:flex;font-size:11px;margin-bottom:3px}
+.hdrline .l{width:150px}
+.hdrline .c{width:14px}
+.hdrline .v{flex:1;border-bottom:1px solid #000;font-weight:bold;padding-left:4px}
+.hdrline .v.nb{border-bottom:0}
+table.form{width:100%;border-collapse:collapse;margin-top:10px;table-layout:fixed}
+table.form th,table.form td{border:1px solid #000;padding:3px 5px;vertical-align:top}
+table.form th{text-align:center;font-size:11px;font-weight:bold}
+.cf-desc{width:56%}
+.cf-unit{width:20%;text-align:center}
+.cf-amt{width:24%;text-align:right}
+.sect{font-weight:bold;padding-left:14px;padding-top:5px}
+.li{display:flex;gap:4px;padding-left:0}
+.li .no{width:16px;flex:none}
+.li .tx{flex:1;word-break:break-word}
+.stack{min-height:1em}
+.stack div{min-height:1.45em}
+.rt{text-align:right;font-variant-numeric:tabular-nums}
+.ct{text-align:center}
+.sub{border-top:1px solid #000;margin-top:3px;padding-top:2px;font-weight:bold;text-align:right}
+.totrow td{font-weight:bold;font-size:12px;padding:5px}
+.sig{display:flex;justify-content:space-between;margin-top:34px;font-size:11px}
+.sig div{width:45%}
+.sig .ln{border-top:1px solid #000;margin-top:34px;width:150px;padding-top:2px}
+table.mil{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:8px}
+table.mil th,table.mil td{border:1px solid #000;padding:4px 4px;font-size:10.5px}
+table.mil th{text-align:center;font-weight:bold}
+table.mil td{height:30px;vertical-align:top}
+.att{page-break-after:always}
+.att .cap{font-size:11px;border:1px solid #000;padding:5px 7px;margin-bottom:8px}
+.att img{max-width:100%;max-height:225mm;display:block;margin:0 auto;object-fit:contain}
+.att .pdfnote{border:1px dashed #000;padding:24px;text-align:center;font-size:12px}
+
+@media print{
+  @page{size:A4 portrait;margin:0}
+  body{background:#fff;padding:0}
+  header,nav,#toast,.mask,.noprint{display:none!important}
+  main{padding:0;max-width:none}
+  .tab{display:none!important}
+  #tab-out{display:block!important}
+  #out{background:#fff}
+  .page{max-width:none;width:210mm;min-height:297mm;margin:0;padding:14mm 12mm;
+    box-shadow:none;border-radius:0;page-break-after:always}
+  .page:last-child{page-break-after:auto}
+}
+</style>
+</head>
+<body>
+
+<div id="auth">
+  <div class="authbox">
+    <h2>Salesman Claim</h2>
+    <div class="sub">Ipoh Hydrotech Engineering Sdn. Bhd.</div>
+    <div class="f"><label>Email</label>
+      <input id="loginEmail" type="email" autocomplete="username" placeholder="you@hydrotech.com"></div>
+    <div class="f"><label>Password</label>
+      <input id="loginPass" type="password" autocomplete="current-password"></div>
+    <div id="authErr"></div>
+    <button class="btn" onclick="doLogin()">Sign In</button>
+    <button class="btn gry" style="margin-top:8px" onclick="runDiag()">Run connection test</button>
+    <div id="diag"></div>
+    <div class="hint" style="margin-top:12px">Use the same login as the Invoice Tracker.
+      Contact your admin if your account is not active.</div>
+  </div>
+</div>
+
+<header>
+  <div class="hrow">
+    <h1 id="hTitle">Salesman Claim</h1>
+    <button class="hbtn" onclick="openSettings()">⚙</button>
+  </div>
+  <div class="hmeta">
+    <select id="fStaff" style="display:none"></select>
+    <input id="fName" type="text" placeholder="Employee's name" autocomplete="name">
+    <select id="fMonth" style="max-width:150px"></select>
+  </div>
+  <div class="syncbar"><span class="dot" id="syncDot"></span><span id="syncTxt">Connecting…</span></div>
+</header>
+
+<main>
+
+<!-- ================= TRIPS ================= -->
+<section id="tab-trips" class="tab on">
+  <div class="roflag">Viewing another employee's claim — read only.</div>
+  <div class="tot"><span>Mileage this month</span><span class="n" id="tripTot">0 km</span></div>
+  <button class="btn" onclick="editTrip(null)">+ Add Trip</button>
+  <div id="tripList" style="margin-top:10px"></div>
+</section>
+
+<!-- ================= TOLL ================= -->
+<section id="tab-toll" class="tab">
+  <div class="roflag">Viewing another employee's claim — read only.</div>
+  <div class="tot"><span>Toll claim</span><span class="n" id="tollTot">RM 0.00</span></div>
+
+  <div class="card">
+    <h2>Toll trips — extracted from mileage</h2>
+    <div id="tollTrips"></div>
+    <div class="hint">Tick “This trip has toll” on a trip to make it appear here. Enter the
+      one-way toll charge; two-way trips are doubled automatically.</div>
+  </div>
+
+  <div class="card">
+    <h2>Monthly toll invoice / statement</h2>
+    <div class="hint" style="margin-bottom:10px">Photograph the monthly toll statement and the AI
+      reads the total, or just key it in below.</div>
+    <div class="f" style="margin-top:10px">
+      <label>Total shown on invoice (RM) — for checking only</label>
+      <input id="tollInvAmt" type="number" step="0.01" inputmode="decimal" placeholder="0.00">
+    </div>
+    <div id="tollCheck"></div>
+  </div>
+</section>
+
+<!-- ================= PARKING ================= -->
+<section id="tab-parking" class="tab">
+  <div class="roflag">Viewing another employee's claim — read only.</div>
+  <div class="tot"><span>Parking</span><span class="n" id="parkTot">RM 0.00</span></div>
+  <label class="btn" style="display:block;text-align:center">📷 Scan parking receipts<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="scanReceipts('parking',this)"></label>
+  <button class="btn sec" style="margin-top:8px" onclick="editRec('parking',null)">✎ Enter manually</button>
+  <div id="parkList" style="margin-top:10px"></div>
+</section>
+
+<!-- ================= F&E ================= -->
+<section id="tab-fne" class="tab">
+  <div class="roflag">Viewing another employee's claim — read only.</div>
+  <div class="tot"><span>Foods &amp; Entertainment</span><span class="n" id="fneTot">RM 0.00</span></div>
+  <label class="btn" style="display:block;text-align:center">📷 Scan F&amp;E receipts<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="scanReceipts('fne',this)"></label>
+  <button class="btn sec" style="margin-top:8px" onclick="editRec('fne',null)">✎ Enter manually</button>
+  <div id="fneList" style="margin-top:10px"></div>
+</section>
+
+<!-- ================= OTHERS ================= -->
+<section id="tab-others" class="tab">
+  <div class="roflag">Viewing another employee's claim — read only.</div>
+  <div class="tot"><span>Others</span><span class="n" id="othTot">RM 0.00</span></div>
+  <label class="btn" style="display:block;text-align:center">📷 Scan other receipts<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="scanReceipts('others',this)"></label>
+  <button class="btn sec" style="margin-top:8px" onclick="editRec('others',null)">✎ Enter manually</button>
+  <div id="othList" style="margin-top:10px"></div>
+</section>
+
+<!-- ================= OUTPUT ================= -->
+<section id="tab-out" class="tab">
+  <div class="roflag">Viewing another employee's claim — read only.</div>
+  <div class="card noprint">
+    <h2>Claim summary</h2>
+    <table class="sum" id="sumTable"></table>
+  </div>
+  <div class="card noprint">
+    <h2>Generate for submission</h2>
+    <div class="btns">
+      <button class="btn" onclick="buildOutput(true)">🖨 Print / Save as PDF</button>
+    </div>
+    <div class="btns" style="margin-top:8px">
+      <button class="btn sec" onclick="buildOutput(false)">↻ Refresh preview</button>
+    </div>
+  </div>
+  <div id="out"></div>
+</section>
+
+</main>
+
+<nav>
+  <button data-t="trips"   class="on"><span class="ic">🚗</span>Mileage</button>
+  <button data-t="toll"><span class="ic">🛣</span>Toll</button>
+  <button data-t="parking"><span class="ic">🅿️</span>Parking</button>
+  <button data-t="fne"><span class="ic">🍽</span>F&amp;E</button>
+  <button data-t="others"><span class="ic">📎</span>Others</button>
+  <button data-t="out"><span class="ic">📄</span>Claim</button>
+</nav>
+
+<div class="mask" id="mask"><div class="sheet" id="sheet"></div></div>
+<div id="toast"></div>
+
+<datalist id="dlArea"></datalist>
+<datalist id="dlCust"></datalist>
+<datalist id="dlToll"></datalist>
+<datalist id="dlReason"></datalist>
+
+<script>
+'use strict';
+/* =====================================================================
+   Hydrotech — Salesman Monthly Claim
+   Single-file offline app.  Data in localStorage, photos/PDFs in IndexedDB.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   Firebase — shares the Invoice Tracker project so salesmen sign in with
+   the accounts they already have (invoiceUsers + sha256, anonymous auth).
+   --------------------------------------------------------------------- */
+const FB_CONFIG = {
+  apiKey: "AIzaSyCRJyLXrXU1JHGShakndrHl_xM63CK9E5k",
+  authDomain: "iht-invoices.firebaseapp.com",
+  databaseURL: "https://iht-invoices-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "iht-invoices",
+  storageBucket: "iht-invoices.firebasestorage.app",
+  messagingSenderId: "1071483045703",
+  appId: "1:1071483045703:web:e80104a6ca2efe340aae62"
+};
+const DB_ROOT   = 'salesmanClaims';   // per-user claim data
+const LIST_ROOT = 'salesmanLists';    // shared customer / area master lists
+
+let fb = { ready:false, db:null, users:null };
+let session = null;                   // {uid,name,email,role,salesman}
+let authFail = null;                  // why anonymous auth failed, if it did
+let viewUid = null;                   // whose claims are on screen (management)
+let readOnly = false;
+
+const LS = 'hydro_claim_v1';          // local cache + offline queue
+const money = n => (Number(n)||0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2});
+const rm    = n => 'RM ' + money(n);
+const uid   = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const $     = s => document.querySelector(s);
+const esc   = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------------- state ---------------- */
+let S = { profile:{name:'', rate:0.40, vehicle:''}, months:{}, cur:'' };
+
+function blankMonth(){ return {trips:[],tollInvAmt:'',parking:[],fne:[],others:[]}; }
+function M(){ if(!S.months[S.cur]) S.months[S.cur]=blankMonth(); return S.months[S.cur]; }
+
+function load(){
+  S={ profile:{name:'',rate:0.40,vehicle:''}, months:{}, cur:S.cur||'' };
+  try{
+    const r=localStorage.getItem(cacheKey()) || (session?null:localStorage.getItem(LS));
+    if(r) S=Object.assign(S,JSON.parse(r));
+  }catch(e){}
+  if(!S.cur) S.cur = new Date().toISOString().slice(0,7);
+  if(!S.profile) S.profile={name:'',rate:0.40,vehicle:''};
+  if(S.profile.rate==null) S.profile.rate=0.40;
+  migrate();
+  M();
+}
+/* v1 stored one comma-separated "customers" string plus a single trip-level
+   "remarks". Each customer now carries its own reason for the visit. */
+function migrate(){
+  Object.values(S.months||{}).forEach(m=>{
+    (m.trips||[]).forEach(t=>{
+      if(t.visits) return;
+      const names=String(t.customers||'').split(',').map(s=>s.trim()).filter(Boolean);
+      t.visits = names.length
+        ? names.map((c,i)=>({customer:c, reason: i===0 ? (t.remarks||'') : ''}))
+        : (t.remarks ? [{customer:'', reason:t.remarks}] : []);
+      delete t.customers; delete t.remarks;
+    });
+  });
+}
+let saveT;
+function save(){
+  if(readOnly) return;
+  clearTimeout(saveT);
+  saveT=setTimeout(()=>{
+    try{ localStorage.setItem(cacheKey(), JSON.stringify(S)); }
+    catch(e){ /* cache is best-effort; the cloud copy is authoritative */ }
+    pushCloud();
+  },250);
+}
+function cacheKey(){ return LS + (session ? ':'+session.uid : ''); }
+
+/* =====================================================================
+   AUTH — mirrors the Invoice Tracker: anonymous Firebase auth, then match
+   email + sha256(password) against the shared `invoiceUsers` table.
+   ===================================================================== */
+/* crypto.subtle only exists in a secure context (https:// or localhost). Opened
+   straight off the disk as file:// it is undefined, and any fallback hash would
+   never match the real SHA-256 stored against the account — so the honest thing
+   is to refuse and say why, not to show "invalid password". */
+function secureOk(){ return !!(window.crypto && window.crypto.subtle); }
+async function sha256(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function initFirebase(){
+  try{
+    firebase.initializeApp(FB_CONFIG);
+    fb.db      = firebase.database();
+    fb.users   = fb.db.ref('invoiceUsers');
+    fb.ready   = true;
+    fb.db.ref('.info/connected').on('value', s=>setSync(s.val()?'ok':'off'));
+  }catch(e){ console.error('firebase init failed', e); setSync('err'); }
+}
+function setSync(state,msg){
+  const d=$('#syncDot'), t=$('#syncTxt'); if(!d) return;
+  d.className='dot'+(state==='off'?' off':state==='err'?' err':'');
+  t.textContent = msg || (state==='ok'?'Synced':state==='off'?'Offline — changes saved on this phone':'Sync error');
+}
+async function doLogin(){
+  const err=$('#authErr');
+  const email=$('#loginEmail').value.trim().toLowerCase();
+  const pass =$('#loginPass').value;
+  err.className=''; err.textContent='';
+  if(!email||!pass){ err.textContent='Enter your email and password.'; return; }
+  if(!fb.ready){ err.textContent='Not connected. Hard-refresh the page and try again.'; return; }
+  if(!secureOk()){ showInsecureHelp(); return; }
+  try{
+    /* Sign in anonymously FIRST — the database rules require it. Never swallow
+       this error: without it the invoiceUsers read below fails as a confusing
+       "permission denied" instead of naming the real problem. */
+    /* Anonymous auth is best-effort: the Invoice Tracker runs the same way and
+       tolerates it failing, so we must too. We only remember WHY it failed, to
+       explain a permission error further down instead of guessing. */
+    err.className='wait'; err.textContent='⏳ Connecting…';
+    if(!firebase.auth().currentUser){
+      try{ await firebase.auth().signInAnonymously(); authFail=null; }
+      catch(ae){ authFail=ae&&ae.code||ae.message||'unknown';
+                 console.warn('anonymous auth unavailable:', authFail); }
+    }
+    err.className='wait'; err.textContent='⏳ Verifying…';
+    const hash = await sha256(pass);
+    const snap = await fb.users.once('value').catch(de=>{ throw de; });
+    err.className='';
+    const users = snap.val()||{};
+    const hit = Object.entries(users).find(([,u]) =>
+      (u.email||u.username||'').toLowerCase()===email && u.passwordHash===hash);
+    if(!hit){ err.textContent='Invalid email or password.'; $('#loginPass').value=''; return; }
+    const [uid,user]=hit;
+    const role=(user.role||'').toLowerCase();
+    if(role==='pending')   { err.textContent='Account pending. Contact your admin to activate it.'; return; }
+    if(role==='suspended') { err.textContent='This account has been suspended. Contact your admin.'; return; }
+    session={ uid, name:user.name||user.username||email, email, role,
+              salesman:user.salesman||user.name||null };
+    sessionStorage.setItem('iht_claim_session', JSON.stringify(session));
+    await startApp();
+  }catch(e){
+    err.className='';
+    console.error('login failed', e);
+    const m=(e&&(e.code||e.message)||'')+'';
+    if(/permission|PERMISSION_DENIED/i.test(m)){
+      if(authFail==='auth/admin-restricted-operation' || authFail==='auth/operation-not-allowed')
+        err.innerHTML='Permission denied — and anonymous sign-in is switched off, so the '+
+          'app has no identity the rules can accept.<br><br><b>Admin, do either one:</b><br>'+
+          '• Firebase Console → Authentication → Sign-in method → <b>Anonymous → Enable</b>, or<br>'+
+          '• make the <code>salesmanClaims</code> / <code>salesmanLists</code> rules not require '+
+          '<code>auth</code>.<br>See FIREBASE-SETUP.md.';
+      else
+        err.innerHTML='Database permission denied reading the staff list.<br>'+
+          'Admin: allow <code>invoiceUsers</code> to be read, and allow read/write on '+
+          '<code>salesmanClaims</code> and <code>salesmanLists</code>. See FIREBASE-SETUP.md.';
+    }
+    else err.textContent='❌ '+(e.message||m)+(authFail?' (auth: '+authFail+')':'');
+  }
+}
+/* =====================================================================
+   CONNECTION TEST — checks each link in the chain and names the exact fix
+   for whichever one fails, instead of guessing from a generic error.
+   ===================================================================== */
+const DIAG_FIX = {
+  secure:  'Serve the app over http/https (GitHub Pages, or <code>npx serve</code>). Browsers disable password hashing on plain files.',
+  sdk:     'The Firebase scripts did not load. Check the internet connection, then hard-refresh (Ctrl+Shift+R).',
+  anon:    'Firebase Console → Authentication → Sign-in method → enable <b>Anonymous</b>. If it is already on, the API key may be restricted: Google Cloud Console → APIs &amp; Services → Credentials → your Browser key → Application restrictions.',
+  users:   'Realtime Database → Rules: allow <code>invoiceUsers</code> to be read.',
+  claims:  'Realtime Database → Rules: add <code>salesmanClaims</code> with read and write. See FIREBASE-SETUP.md step 1.',
+  lists:   'Realtime Database → Rules: add <code>salesmanLists</code> with read and write. See FIREBASE-SETUP.md step 1.',
+  settings:'Realtime Database → Rules: allow <code>appSettings</code> to be read (only needed for AI odometer reading).',
+};
+async function runDiag(){
+  const box=$('#diag');
+  const rows=[];
+  const put=(k,label,ok,detail)=>{
+    rows.push({k,label,ok,detail});
+    box.innerHTML='<div style="margin-top:12px;font-size:12.5px;line-height:1.5">'+rows.map(r=>
+      `<div style="margin-bottom:6px"><b style="color:${r.ok?'var(--ok)':'var(--err)'}">${r.ok?'✓':'✗'}</b> ${esc(r.label)}`
+      + (r.ok?'':`<div style="color:var(--err);font-size:11.5px;margin:2px 0 0 14px">${esc(r.detail||'')}</div>`
+             + `<div style="font-size:11.5px;margin:3px 0 0 14px;color:var(--muted)">${DIAG_FIX[r.k]||''}</div>`)
+      + '</div>').join('')+'</div>';
+  };
+  box.innerHTML='<div style="margin-top:12px;font-size:12.5px">⏳ Testing…</div>';
+
+  put('secure', 'Secure context (password hashing available)', secureOk(), 'Page opened as a plain file');
+  put('sdk', 'Firebase connected', fb.ready, 'Firebase did not initialise');
+  if(!fb.ready) return;
+
+  let anonOk=false, anonErr='';
+  try{
+    if(!firebase.auth().currentUser) await firebase.auth().signInAnonymously();
+    anonOk=!!firebase.auth().currentUser;
+  }catch(e){ anonErr=(e&&e.code)||e.message||'failed'; }
+  put('anon','Anonymous sign-in', anonOk, anonErr);
+
+  const probeRead = async (key,label,path)=>{
+    try{ await fb.db.ref(path).limitToFirst(1).once('value'); put(key,label,true); return true; }
+    catch(e){ put(key,label,false,(e&&e.code)||e.message||'denied'); return false; }
+  };
+  await probeRead('users','Read staff list (invoiceUsers)','invoiceUsers');
+  await probeRead('settings','Read app settings (AI key)','appSettings');
+  await probeRead('claims','Read claims (salesmanClaims)',DB_ROOT);
+
+  try{
+    await fb.db.ref(DB_ROOT+'/__diag').set({t:Date.now()});
+    await fb.db.ref(DB_ROOT+'/__diag').remove();
+    put('claims','Write claims (salesmanClaims)',true);
+  }catch(e){ put('claims','Write claims (salesmanClaims)',false,(e&&e.code)||e.message||'denied'); }
+
+  try{
+    await fb.db.ref(LIST_ROOT).once('value');
+    put('lists','Read shared name lists (salesmanLists)',true);
+  }catch(e){ put('lists','Read shared name lists (salesmanLists)',false,(e&&e.code)||e.message||'denied'); }
+
+}
+
+function showInsecureHelp(){
+  const err=$('#authErr');
+  err.className='';
+  err.innerHTML='This app must be opened over <b>http</b> or <b>https</b>, not straight '+
+    'from the file. Browsers disable the password-hashing needed to sign in when a page '+
+    'is opened as a file.<br><br>Put it on GitHub Pages like the other apps, or run '+
+    '<code>npx serve</code> in this folder and open the localhost address it prints.';
+}
+function logout(){
+  sessionStorage.removeItem('iht_claim_session');
+  location.reload();
+}
+
+/* =====================================================================
+   CLOUD SYNC — claim data lives at salesmanClaims/{uid}; the local copy is
+   a cache so the app keeps working with no signal out on the road.
+   ===================================================================== */
+function dataRef(uid){ return fb.db.ref(DB_ROOT+'/'+(uid||viewUid)); }
+let cloudT, pulling=false;
+function pushCloud(){
+  if(!fb.ready||!session||readOnly) return;
+  clearTimeout(cloudT);
+  cloudT=setTimeout(()=>{
+    dataRef(session.uid).set({ profile:S.profile, months:S.months, updated:Date.now() })
+      .then(()=>setSync('ok'))
+      .catch(e=>{ console.warn('push failed',e); setSync('off'); });
+  },600);
+}
+function watchCloud(uid){
+  if(!fb.ready) return;
+  dataRef(uid).on('value', snap=>{
+    const v=snap.val(); if(!v) return;
+    if(pulling) return;
+    /* Another device (or the salesman, for a manager) is the source of truth
+       for everything except what this device is mid-edit. */
+    if($('#mask').classList.contains('on')) return;   // don't yank an open form
+    S.profile = Object.assign(S.profile||{}, v.profile||{});
+    S.months  = v.months||{};
+    migrate(); M();
+    try{ localStorage.setItem(cacheKey(), JSON.stringify(S)); }catch(e){}
+    $('#fName').value=S.profile.name||'';
+    renderAll();
+  }, e=>{ console.warn('watch failed',e); setSync('err'); });
+}
+
+/* Shared customer / area lists — so a name typed on one phone is offered on
+   every other phone, which is what "when they log in to their account" needs. */
+function pushLists(){
+  if(!fb.ready||!session||readOnly) return;
+  fb.db.ref(LIST_ROOT).update({
+    customers: S.profile.knownCustomers||[],
+    areas:     S.profile.knownAreas||[],
+    tolls:     S.profile.knownTolls||[],
+    reasons:   S.profile.knownReasons||[]
+  }).catch(()=>{});
+}
+let sharedLists={customers:[],areas:[],tolls:[],reasons:[]};
+function watchLists(){
+  if(!fb.ready) return;
+  fb.db.ref(LIST_ROOT).on('value', s=>{
+    const v=s.val()||{};
+    sharedLists={ customers:v.customers||[], areas:v.areas||[],
+                  tolls:v.tolls||[], reasons:v.reasons||[] };
+    fillLists();
+  }, ()=>{});
+}
+
+/* ---------------------------------------------------------------------
+   Photos are a means to an end, not a record.
+   A photo exists only long enough for the AI to read it and the salesman to
+   confirm what it read. Then it is dropped. Nothing is written to IndexedDB,
+   nothing is uploaded, and the original paper receipt — which the salesman
+   has already annotated by hand — is what gets attached to the claim.
+   --------------------------------------------------------------------- */
+let shots = [];                       // {id,blob,url,name,type} — this session only
+function addShot(blob,name){
+  const s={ id:uid(), blob, name:name||'photo.jpg', type:blob.type||'image/jpeg',
+            url:URL.createObjectURL(blob) };
+  shots.push(s); return s;
+}
+function dropShots(){
+  shots.forEach(s=>{ try{ URL.revokeObjectURL(s.url); }catch(e){} });
+  shots=[];
+}
+const b64 = blob => new Promise((res,rej)=>{ const r=new FileReader();
+  r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(blob); });
+
+/* ---------------- image handling ---------------- */
+async function shrink(file,max=1500,q=.75){
+  if(!file.type.startsWith('image/')) return file;
+  try{
+    const bmp = await createImageBitmap(file,{imageOrientation:'from-image'});
+    const s = Math.min(1, max/Math.max(bmp.width,bmp.height));
+    const c = document.createElement('canvas');
+    c.width=Math.round(bmp.width*s); c.height=Math.round(bmp.height*s);
+    c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+    const out = await new Promise(r=>c.toBlob(r,'image/jpeg',q));
+    bmp.close && bmp.close();
+    return (out && out.size < file.size) ? out : file;
+  }catch(e){ return file; }
+}
+async function takeShots(inp){
+  const out=[];
+  for(const f of inp.files){
+    if(f.type==='application/pdf'||/\.pdf$/i.test(f.name||'')){
+      toast('PDFs can\'t be read — photograph the receipt instead'); continue;
+    }
+    out.push(addShot(await shrink(f), f.name));
+  }
+  inp.value='';
+  return out;
+}
+
+/* ---------------- ui helpers ---------------- */
+function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('on');
+  clearTimeout(t._x); t._x=setTimeout(()=>t.classList.remove('on'),2200); }
+function openSheet(html){ $('#sheet').innerHTML=html; $('#mask').classList.add('on'); }
+function closeSheet(){ $('#mask').classList.remove('on'); $('#sheet').innerHTML=''; }
+$('#mask').addEventListener('click',e=>{ if(e.target.id==='mask') closeSheet(); });
+
+function monthLabel(k){ const [y,m]=k.split('-');
+  return new Date(y,m-1,1).toLocaleDateString('en-MY',{month:'long',year:'numeric'}); }
+function dayLabel(d){ if(!d) return ''; const x=new Date(d+'T00:00:00');
+  return isNaN(x) ? d : x.toLocaleDateString('en-MY',{day:'2-digit',month:'short'}); }
+function dmy(d){ if(!d) return ''; const x=new Date(d+'T00:00:00'); if(isNaN(x)) return d;
+  const p=n=>String(n).padStart(2,'0'); return p(x.getDate())+'/'+p(x.getMonth()+1)+'/'+x.getFullYear(); }
+
+/* ---------------- month selector ---------------- */
+function fillMonths(){
+  const sel=$('#fMonth'); const now=new Date(); const keys=new Set(Object.keys(S.months));
+  for(let i=-1;i<14;i++){ const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    keys.add(d.toISOString().slice(0,7)); }
+  keys.add(S.cur);
+  sel.innerHTML=[...keys].sort().reverse()
+    .map(k=>`<option value="${k}"${k===S.cur?' selected':''}>${monthLabel(k)}</option>`).join('');
+}
+
+/* ---------------- totals ---------------- */
+const num = v => Number(v)||0;
+function tripKm(t){ const d=num(t.endKm)-num(t.startKm); return d>0?d:0; }
+function tollOf(t){ return t.toll ? num(t.tollRate)*(num(t.tollWay)||1) : 0; }
+const sumBy=(a,f)=>a.reduce((s,x)=>s+num(f(x)),0);
+
+function totals(){
+  const m=M(), rate=num(S.profile.rate)||0.40;
+  const km   = sumBy(m.trips, tripKm);
+  const toll = sumBy(m.trips, tollOf);
+  const park = sumBy(m.parking, r=>r.amount);
+  const fne  = sumBy(m.fne,     r=>r.amount);
+  const oth  = sumBy(m.others,  r=>r.amount);
+  const mil  = km*rate;
+  return {km,rate,mil,toll,park,fne,oth,grand:mil+toll+park+fne+oth};
+}
+
+/* =====================================================================
+   TRIPS
+   ===================================================================== */
+function renderTrips(){
+  const m=M(); const list=$('#tripList');
+  const t=totals();
+  $('#tripTot').textContent = t.km.toLocaleString('en-MY')+' km  ·  '+rm(t.mil);
+  const trips=[...m.trips].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  if(!trips.length){ list.innerHTML='<div class="empty">No trips recorded yet.<br>Tap <b>+ Add Trip</b> after each outstation journey.</div>'; return; }
+  list.innerHTML = trips.map(t=>{
+    const km=tripKm(t);
+    return `<div class="item">
+      <div class="top">
+        <div class="g">
+          <div class="t1">${esc(dayLabel(t.date))} · ${esc(t.area||'—')}</div>
+          ${(t.visits||[]).length
+            ? (t.visits||[]).map(v=>`<div class="t2"><b>${esc(v.customer)}</b>${v.reason?' — '+esc(v.reason):''}</div>`).join('')
+            : '<div class="t2">No customer recorded</div>'}
+          <div class="t2">Odo ${num(t.startKm).toLocaleString()} → ${num(t.endKm).toLocaleString()}</div>
+          ${t.toll?`<div class="t2"><span class="tag toll">TOLL</span>${esc(t.tollFrom||'?')} → ${esc(t.tollTo||'?')} (${num(t.tollWay)===2?'2 way':'1 way'}) ${t.tollRate?'· '+rm(tollOf(t)):''}</div>`:''}
+        </div>
+        <div style="text-align:right">
+          <div class="amt">${km.toLocaleString()} km</div>
+          <div class="t2">${rm(km*(num(S.profile.rate)||0.40))}</div>
+        </div>
+      </div>
+      <div class="iacts">
+        <button onclick="editTrip('${t.id}')">✎ Edit</button>
+        <button class="d" onclick="delTrip('${t.id}')">🗑 Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function editTrip(id){
+  const m=M();
+  const t = id ? m.trips.find(x=>x.id===id)
+              : { id:uid(), date:defaultDate(), area:'', startKm:lastEndKm(), endKm:'',
+                  visits:[{customer:'',reason:''}], toll:false, tollFrom:'', tollTo:'',
+                  tollWay:2, tollRate:'', photos:[] };
+  const isNew = !id;
+  openSheet(`
+    <h3>${isNew?'New Trip':'Edit Trip'}<button onclick="closeSheet()">×</button></h3>
+    <div class="card">
+      <div class="row">
+        <div class="f"><label>Date</label><input id="e_date" type="date" value="${esc(t.date)}"></div>
+        <div class="f"><label>Area travelled to</label>
+          <input id="e_area" type="text" list="dlArea" value="${esc(t.area)}" placeholder="e.g. Taiping"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Customers visited</h2>
+      <div id="e_visits"></div>
+      <button class="btn sec" type="button" onclick="addVisit()">+ Add another customer</button>
+      <div class="hint">The reason goes into the Remarks column of the mileage form,
+        on the same line as its customer.</div>
+    </div>
+
+    <div class="card">
+      <h2>Odometer</h2>
+      <div class="row">
+        <div class="f"><label>Start (km)</label>
+          <input id="e_s" type="number" inputmode="numeric" step="1" value="${esc(t.startKm)}"></div>
+        <div class="f"><label>End (km)</label>
+          <input id="e_e" type="number" inputmode="numeric" step="1" value="${esc(t.endKm)}"></div>
+      </div>
+      <div class="tot" style="margin:2px 0 10px"><span>Trip distance</span><span class="n" id="e_km">0 km</span></div>
+      <div class="filebar">
+        <label>📷 Photo of odometer<input type="file" accept="image/*" capture="environment" onchange="tripPhotos(this)" multiple></label>
+        <label>📁 Gallery<input type="file" accept="image/*" onchange="tripPhotos(this)" multiple></label>
+      </div>
+      <div class="thumbs" id="e_ph" style="margin-top:10px"></div>
+      <button type="button" class="aibtn" id="aiBtn" onclick="readOdometer()" disabled>
+        ✨ Read the odometer from the photo</button>
+      <div class="airesult" id="aiOut"></div>
+      <div class="hint">Take one photo at the start and one at the end and the AI fills in both.
+        Always check the numbers against the photo — you are signing for them.</div>
+    </div>
+
+    <div class="card">
+      <div class="chk"><input type="checkbox" id="e_toll" ${t.toll?'checked':''} onchange="tollBox()">
+        <label for="e_toll">This trip has toll</label></div>
+      <div id="e_tollbox" style="display:${t.toll?'block':'none'}">
+        <div class="row">
+          <div class="f"><label>From toll</label>
+            <input id="e_tf" type="text" list="dlToll" value="${esc(t.tollFrom)}" placeholder="e.g. Ipoh Selatan"></div>
+          <div class="f"><label>To toll</label>
+            <input id="e_tt" type="text" list="dlToll" value="${esc(t.tollTo)}" placeholder="e.g. Bidor"></div>
+        </div>
+        <div class="f"><label>Direction</label>
+          <div class="seg">
+            <button type="button" id="w1" class="${num(t.tollWay)===1?'on':''}" onclick="setWay(1)">One way</button>
+            <button type="button" id="w2" class="${num(t.tollWay)!==1?'on':''}" onclick="setWay(2)">Two way (return)</button>
+          </div></div>
+        <div class="f"><label>Toll charge one way (RM) — optional, can fill later from invoice</label>
+          <input id="e_tr" type="number" step="0.01" inputmode="decimal" value="${esc(t.tollRate)}" placeholder="0.00"></div>
+      </div>
+    </div>
+
+    <div id="e_err"></div>
+    <div class="btns">
+      <button class="btn gry" onclick="closeSheet()">Cancel</button>
+      <button class="btn" onclick="saveTrip('${t.id}',${isNew})">Save Trip</button>
+    </div>`);
+
+  window._draft = JSON.parse(JSON.stringify(t));
+  if(!window._draft.visits || !window._draft.visits.length)
+    window._draft.visits=[{customer:'',reason:''}];
+  drawDraftPhotos(); drawVisits();
+  const upd=()=>{ const d=num($('#e_e').value)-num($('#e_s').value);
+    $('#e_km').textContent = (d>0?d:0).toLocaleString()+' km'; };
+  $('#e_s').oninput=upd; $('#e_e').oninput=upd; upd();
+}
+/* ---- customers visited + reason for each ---- */
+function readVisits(){
+  return [...document.querySelectorAll('#e_visits .vrow')].map(r=>({
+    customer:r.querySelector('.vc').value.trim(),
+    reason  :r.querySelector('.vr').value.trim() }));
+}
+function drawVisits(){
+  const box=$('#e_visits'); if(!box) return;
+  const v=window._draft.visits;
+  box.innerHTML=v.map((x,i)=>`
+    <div class="vrow">
+      <div class="vn">${i+1}</div>
+      <div class="vf">
+        <input class="vc" type="text" list="dlCust" value="${esc(x.customer)}" placeholder="Customer name">
+        <input class="vr" type="text" list="dlReason" value="${esc(x.reason)}" placeholder="Reason for the visit">
+      </div>
+      <button type="button" class="vx" onclick="rmVisit(${i})" ${v.length<2?'disabled':''}>×</button>
+    </div>`).join('');
+}
+function addVisit(){
+  window._draft.visits=readVisits();
+  window._draft.visits.push({customer:'',reason:''});
+  drawVisits();
+  const rows=document.querySelectorAll('#e_visits .vrow .vc');
+  rows[rows.length-1].focus();
+}
+function rmVisit(i){
+  const v=readVisits(); v.splice(i,1);
+  window._draft.visits = v.length ? v : [{customer:'',reason:''}];
+  drawVisits();
+}
+/* =====================================================================
+   AI ODOMETER READING
+   Reads the number off an odometer photo so the salesman doesn't key it in.
+   The key lives in the Invoice Tracker's appSettings (same project) — the
+   scanner there already works this way.
+   ===================================================================== */
+const AI_MODEL = 'claude-opus-5';
+let appSettings = {};
+function watchSettings(){
+  if(!fb.ready) return;
+  fb.db.ref('appSettings').on('value', s=>{ appSettings=s.val()||{}; refreshAiBtns(); }, ()=>{});
+}
+function aiKey(){ return appSettings.claudeApiKey || localStorage.getItem('iht_claude_key') || ''; }
+function refreshAiBtns(){
+  document.querySelectorAll('.aibtn').forEach(b=>{
+    b.disabled = !aiKey() || !shots.length;
+  });
+}
+
+/* ---------- shared call ---------- */
+async function askClaude(shotList, prompt, schema, maxTokens){
+  const key=aiKey();
+  if(!key) throw new Error('no-key');
+  const content=[];
+  for(const s of shotList.slice(0,8))
+    content.push({ type:'image', source:{ type:'base64', media_type:s.type, data: await b64(s.blob) } });
+  if(!content.length) throw new Error('No photos to read.');
+  content.push({ type:'text', text:prompt });
+
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'x-api-key':key,
+              'anthropic-version':'2023-06-01',
+              'anthropic-dangerous-direct-browser-access':'true' },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      max_tokens: maxTokens,
+      output_config:{ effort:'low', format:{ type:'json_schema', schema } },
+      messages:[{ role:'user', content }]
+    })
+  });
+  if(!res.ok){
+    const e=await res.json().catch(()=>({}));
+    throw new Error((e.error&&e.error.message)||('AI service error '+res.status));
+  }
+  const data=await res.json();
+  if(data.stop_reason==='refusal') throw new Error('The AI declined to read this image.');
+  const txt=(data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('').trim();
+  return JSON.parse(txt);
+}
+
+/* =====================================================================
+   RECEIPT SCANNING
+   The salesman writes the customer name and/or the reason by hand on the
+   paper receipt before photographing it, so the handwriting is part of the
+   claim, not noise — it becomes the description on the claim form.
+   ===================================================================== */
+const RECEIPT_SCHEMA = {
+  type:'object',
+  properties:{
+    receipts:{ type:'array', items:{ type:'object', properties:{
+      date:{type:'string', description:'Receipt date as YYYY-MM-DD, or "" if not shown.'},
+      amount:{type:'number', description:'Total actually paid, in ringgit.'},
+      vendor:{type:'string', description:'Business name printed on the receipt, or "".'},
+      handwritten:{type:'string', description:'Any handwritten note on the receipt, transcribed verbatim. "" if none.'},
+      description:{type:'string', description:'Short claim-form description.'},
+      confident:{type:'boolean', description:'False if the date or amount is unclear.'}
+    }, required:['date','amount','vendor','handwritten','description','confident'],
+       additionalProperties:false } },
+    note:{ type:'string', description:'Short reason if a photo could not be read; "" otherwise.' }
+  },
+  required:['receipts','note'], additionalProperties:false
+};
+const CAT_HINT = {
+  parking:'parking receipts / car park tickets',
+  fne:'food & entertainment receipts from restaurants and cafes',
+  others:'miscellaneous business expense receipts',
+  toll:'toll receipts or a monthly toll / Touch ’n Go statement'
+};
+function receiptPrompt(cat){
+  return `These are photos of ${CAT_HINT[cat]||'expense receipts'} that a Malaysian salesman is claiming.
+
+Return one entry per receipt, in the order the photos are given. If one photo contains several separate receipts, return one entry for each.
+
+For each receipt:
+- "amount" is the TOTAL actually paid, as a number in ringgit. If the receipt shows a subtotal, service charge, SST and a total, take the final total. Never add the receipts together.
+- "date" is the transaction date as YYYY-MM-DD. Malaysian receipts are usually DD/MM/YYYY — read 03/08/2026 as 2026-08-03, never as 3 August in American order. Use "" if no date is printed.
+- "vendor" is the business name printed on the receipt.
+- "handwritten" is any handwriting the salesman has added — typically a customer or company name, or the reason for the expense. Transcribe it exactly as written, and leave it "" if there is none. This is important: it is how the claim is justified.
+- "description" is a short line for the claim form. When there is handwriting, lead with it, because that is what identifies the claim — e.g. "Lunch with Perak Water Sdn Bhd", "Parking - site visit Taiping". When there is none, describe the expense from the vendor, e.g. "Parking - MBI Ipoh".
+- Set "confident" to false if the date or the amount is blurred, cropped or ambiguous.
+
+Read only what is actually printed or written. Do not invent a date or an amount, and do not guess a customer name that is not on the receipt. If a photo shows no readable receipt, leave it out of "receipts" and say why in "note".`;
+}
+
+async function scanReceipts(cat, inp){
+  const added = await takeShots(inp);
+  if(!added.length) return;
+  if(!aiKey()){
+    openReview(cat, added.map(()=>({date:defaultDate(),amount:'',description:'',handwritten:'',confident:true})), true);
+    return;
+  }
+  openScanning(added.length);
+  try{
+    const parsed = await askClaude(added, receiptPrompt(cat), RECEIPT_SCHEMA, 4000);
+    const rows=(parsed.receipts||[]).map(r=>({
+      date: /^\d{4}-\d{2}-\d{2}$/.test(r.date||'') ? r.date : defaultDate(),
+      amount: Number(r.amount)||'',
+      description: (r.description||r.handwritten||r.vendor||'').trim(),
+      handwritten: (r.handwritten||'').trim(),
+      confident: r.confident!==false
+    }));
+    if(!rows.length){
+      closeSheet(); dropShots();
+      toast(parsed.note ? 'Nothing readable — '+parsed.note : 'No receipt found in that photo');
+      return;
+    }
+    openReview(cat, rows, false, parsed.note);
+  }catch(err){
+    console.error(err);
+    closeSheet();
+    if(err.message==='no-key') toast('AI is not set up — enter the details manually');
+    else toast('Could not read it: '+err.message);
+    openReview(cat, added.map(()=>({date:defaultDate(),amount:'',description:'',handwritten:'',confident:true})), true);
+  }
+}
+function openScanning(n){
+  openSheet(`<h3>Reading ${n} photo${n>1?'s':''}…</h3>
+    <div class="card" style="text-align:center;padding:26px">
+      <div style="font-size:32px">✨</div>
+      <div class="hint" style="margin-top:8px">Reading the date, amount and your handwriting.</div>
+    </div>`);
+}
+
+/* Nothing is saved until the salesman has looked at it. This screen is the
+   verification step, and the photos are released the moment it closes. */
+function openReview(cat, rows, manual, note){
+  const c=CATS[cat]||{title:'Toll'};
+  openSheet(`
+    <h3>${manual?'Enter':'Check'} ${esc(c.title)}<button onclick="cancelReview()">×</button></h3>
+    ${note?`<div class="roflag" style="display:block">${esc(note)}</div>`:''}
+    ${manual?'<div class="hint" style="margin-bottom:10px">Type the details from the receipt.</div>'
+            :'<div class="hint" style="margin-bottom:10px">Read from your photos — correct anything wrong, then add.</div>'}
+    <div id="revRows"></div>
+    <div class="btns" style="margin-top:6px">
+      <button class="btn gry" onclick="cancelReview()">Cancel</button>
+      <button class="btn" onclick="commitReview('${cat}')">Add to claim</button>
+    </div>
+    <div class="hint" style="margin-top:10px">The photos are deleted once you add these —
+      staple the original receipts to your printed claim form.</div>`);
+  window._rev=rows;
+  drawReview();
+}
+function drawReview(){
+  const box=$('#revRows'); if(!box) return;
+  box.innerHTML=window._rev.map((r,i)=>`
+    <div class="item" style="${r.confident?'':'border-color:#f0c9a0;background:#fffdf8'}">
+      ${r.confident?'':'<div class="t2" style="color:var(--warn);font-weight:700;margin-bottom:6px">⚠ Hard to read — please check</div>'}
+      ${r.handwritten?`<div class="t2" style="margin-bottom:6px">Your note: <b>${esc(r.handwritten)}</b></div>`:''}
+      <div class="row">
+        <div class="f" style="margin-bottom:8px"><label>Date</label>
+          <input type="date" value="${esc(r.date)}" onchange="window._rev[${i}].date=this.value"></div>
+        <div class="f" style="margin-bottom:8px"><label>Amount (RM)</label>
+          <input type="number" step="0.01" inputmode="decimal" value="${esc(r.amount)}"
+                 onchange="window._rev[${i}].amount=this.value"></div>
+      </div>
+      <div class="f" style="margin-bottom:8px"><label>Description</label>
+        <input type="text" value="${esc(r.description)}" onchange="window._rev[${i}].description=this.value"></div>
+      <div class="iacts"><button class="d" onclick="dropReview(${i})">🗑 Not a claim</button></div>
+    </div>`).join('');
+}
+function dropReview(i){ window._rev.splice(i,1);
+  if(!window._rev.length) return cancelReview();
+  drawReview(); }
+function cancelReview(){ dropShots(); closeSheet(); }
+function commitReview(cat){
+  const bad=window._rev.filter(r=>!(Number(r.amount)>0)||!r.description.trim());
+  if(bad.length){ toast('Every line needs an amount and a description'); return; }
+  const arr = cat==='toll' ? null : M()[cat];
+  window._rev.forEach(r=>{
+    const rec={ id:uid(), date:r.date, desc:r.description.trim(), amount:Number(r.amount) };
+    if(arr) arr.push(rec);
+  });
+  const n=window._rev.length;
+  dropShots(); save(); closeSheet(); renderAll();
+  toast(`${n} item${n>1?'s':''} added — photos discarded`);
+}
+
+const ODO_SCHEMA = {
+  type:'object',
+  properties:{
+    readings:{ type:'array', items:{ type:'object', properties:{
+      km:{type:'integer', description:'The odometer reading in whole kilometres.'},
+      confident:{type:'boolean', description:'True only if every digit is clearly legible.'}
+    }, required:['km','confident'], additionalProperties:false } },
+    note:{ type:'string', description:'Short reason if nothing could be read; "" otherwise.' }
+  },
+  required:['readings','note'], additionalProperties:false
+};
+const ODO_PROMPT =
+`These are photos of a vehicle odometer taken by a salesman recording a trip.
+
+For EACH photo, in order, read the total-distance odometer reading and return it in whole kilometres.
+
+Rules:
+- Read the main ODO / total distance display, never a trip meter (TRIP A / TRIP B), speedometer, fuel gauge, temperature or clock.
+- Malaysian vehicles read in kilometres. Ignore any tenths shown after a decimal point or in a differently-shaded final digit — return whole kilometres only.
+- Return the digits exactly as shown. Do not round, guess a plausible mileage, or correct a number that looks unusual.
+- Set "confident" to false if the photo is blurred, glared, cropped, or any digit is ambiguous.
+- If a photo shows no readable odometer, omit it from "readings" and explain briefly in "note".`;
+
+async function readOdometer(which){
+  const out=$('#aiOut');
+  if(!aiKey()){ out.innerHTML='<span style="color:var(--warn)">AI reading is not set up. Ask your admin to add the Claude API key in the Invoice Tracker.</span>'; return; }
+  if(!shots.length){ out.innerHTML='<span style="color:var(--warn)">Take a photo of the odometer first.</span>'; return; }
+  const btn=$('#aiBtn'); if(btn) btn.disabled=true;
+  out.innerHTML='⏳ Reading the odometer…';
+  try{
+    applyOdo(await askClaude(shots, ODO_PROMPT, ODO_SCHEMA, 2000), which);
+  }catch(err){
+    console.error(err);
+    out.innerHTML='<span style="color:var(--err)">Could not read it — '+esc(err.message)+'. Key the reading in manually.</span>';
+  }finally{ refreshAiBtns(); }
+}
+function applyOdo(parsed, which){
+  const out=$('#aiOut');
+  const rs=(parsed.readings||[]).filter(r=>Number.isFinite(r.km)&&r.km>0);
+  if(!rs.length){
+    out.innerHTML='<span style="color:var(--warn)">No odometer reading found'+
+      (parsed.note?' — '+esc(parsed.note):'')+'. Key it in manually.</span>';
+    return;
+  }
+  /* Two photos of one trip are start-then-end; a single photo fills whichever
+     box the salesman tapped. Always shown for confirmation, never silently used. */
+  let msg='';
+  if(rs.length>=2){
+    const a=Math.min(rs[0].km,rs[1].km), b=Math.max(rs[0].km,rs[1].km);
+    $('#e_s').value=a; $('#e_e').value=b;
+    msg=`Filled in start <b>${a.toLocaleString()}</b> and end <b>${b.toLocaleString()}</b>`;
+  }else{
+    const t = which==='end' ? '#e_e' : (!$('#e_s').value ? '#e_s' : '#e_e');
+    $(t).value=rs[0].km;
+    msg=`Filled in ${t==='#e_s'?'start':'end'} <b>${rs[0].km.toLocaleString()}</b>`;
+  }
+  $('#e_s').dispatchEvent(new Event('input'));
+  const shaky=rs.some(r=>!r.confident);
+  out.innerHTML=`<span style="color:${shaky?'var(--warn)':'var(--ok)'}">${shaky?'⚠':'✓'} ${msg}. `+
+    (shaky?'Some digits were hard to read — please check against the photo.'
+          :'Please check it against the photo before saving.')+'</span>';
+}
+function setWay(w){ window._draft.tollWay=w;
+  $('#w1').classList.toggle('on',w===1); $('#w2').classList.toggle('on',w===2); }
+function tollBox(){ $('#e_tollbox').style.display = $('#e_toll').checked?'block':'none'; }
+
+function defaultDate(){
+  const t=new Date().toISOString().slice(0,10);
+  return t.slice(0,7)===S.cur ? t : S.cur+'-01';
+}
+function lastEndKm(){
+  const ts=[...M().trips].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  return ts.length ? ts[ts.length-1].endKm : '';
+}
+async function tripPhotos(inp){
+  await takeShots(inp);
+  drawDraftPhotos(); refreshAiBtns();
+}
+function drawDraftPhotos(){
+  const box=$('#e_ph'); if(!box) return; box.innerHTML='';
+  shots.forEach((s,i)=>{
+    const w=document.createElement('div'); w.style.position='relative';
+    const im=document.createElement('img'); im.className='thumb'; im.src=s.url; w.appendChild(im);
+    const x=document.createElement('button'); x.textContent='×';
+    x.style.cssText='position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:#c0392b;color:#fff;font-size:13px;line-height:1;padding:0';
+    x.onclick=()=>{ try{URL.revokeObjectURL(s.url);}catch(e){} shots.splice(i,1); drawDraftPhotos(); refreshAiBtns(); };
+    w.appendChild(x); box.appendChild(w);
+  });
+}
+function saveTrip(id,isNew){
+  const d=window._draft;
+  d.date=$('#e_date').value; d.area=$('#e_area').value.trim();
+  d.startKm=$('#e_s').value; d.endKm=$('#e_e').value;
+  d.visits=readVisits().filter(v=>v.customer||v.reason);
+  d.toll=$('#e_toll').checked;
+  if(d.toll){ d.tollFrom=$('#e_tf').value.trim(); d.tollTo=$('#e_tt').value.trim();
+              d.tollRate=$('#e_tr').value; }
+  const errs=[];
+  if(!d.date) errs.push('Date is required.');
+  if(d.date && d.date.slice(0,7)!==S.cur) errs.push('Date is outside '+monthLabel(S.cur)+'.');
+  if(d.startKm===''||d.endKm==='') errs.push('Both odometer readings are required.');
+  else if(num(d.endKm)<=num(d.startKm)) errs.push('End reading must be greater than start reading.');
+  if(!d.area) errs.push('Area is required.');
+  if(!d.visits.length) errs.push('Record at least one customer visited.');
+  else if(d.visits.some(v=>!v.customer)) errs.push('Every line needs a customer name.');
+  else if(d.visits.some(v=>!v.reason)) errs.push('Every customer needs a reason for the visit.');
+  if(errs.length){ $('#e_err').innerHTML='<div class="err">'+errs.map(esc).join('<br>')+'</div>'; return; }
+
+  const m=M();
+  if(isNew) m.trips.push(d);
+  else m.trips[m.trips.findIndex(x=>x.id===id)]=d;
+  save(); closeSheet(); renderAll(); toast('Trip saved');
+}
+function delTrip(id){
+  if(!confirm('Delete this trip?')) return;
+  const m=M(); const i=m.trips.findIndex(x=>x.id===id);
+  m.trips.splice(i,1); save(); renderAll(); toast('Trip deleted');
+}
+
+/* =====================================================================
+   TOLL
+   ===================================================================== */
+function renderToll(){
+  const m=M(), t=totals();
+  $('#tollTot').textContent = rm(t.toll);
+  const trips=m.trips.filter(x=>x.toll).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const box=$('#tollTrips');
+  box.innerHTML = !trips.length
+    ? '<div class="empty">No toll trips this month.</div>'
+    : trips.map(x=>`<div class="item">
+        <div class="top">
+          <div class="g">
+            <div class="t1">${esc(dayLabel(x.date))} · ${esc(x.tollFrom||'?')} → ${esc(x.tollTo||'?')}</div>
+            <div class="t2"><span class="tag">${num(x.tollWay)===2?'2 WAY':'1 WAY'}</span>${esc(x.area||'')}</div>
+          </div>
+          <div class="amt">${rm(tollOf(x))}</div>
+        </div>
+        <div class="row" style="margin-top:8px;align-items:flex-end">
+          <div class="f" style="margin:0"><label>One-way charge (RM)</label>
+            <input type="number" step="0.01" inputmode="decimal" value="${esc(x.tollRate)}"
+              onchange="setTollRate('${x.id}',this.value)"></div>
+          <div style="flex:0 0 auto"><button class="btn sm gry" onclick="editTrip('${x.id}')">✎ Trip</button></div>
+        </div>
+      </div>`).join('');
+
+  $('#tollInvAmt').value = m.tollInvAmt ?? '';
+  const inv=num(m.tollInvAmt), diff=inv-t.toll;
+  $('#tollCheck').innerHTML = !inv ? ''
+    : `<div class="hint" style="font-weight:700;color:${Math.abs(diff)<0.01?'var(--ok)':'var(--warn)'}">
+       ${Math.abs(diff)<0.01 ? '✓ Matches the invoice total.'
+        : 'Difference of '+rm(Math.abs(diff))+' — invoice is '+(diff>0?'higher':'lower')+' than the trips claimed.'}</div>`;
+}
+function setTollRate(id,v){
+  const t=M().trips.find(x=>x.id===id); if(!t) return;
+  t.tollRate=v; save(); renderAll();
+}
+$('#tollInvAmt').addEventListener('input',e=>{ M().tollInvAmt=e.target.value; save(); renderToll(); });
+
+
+
+/* =====================================================================
+   RECEIPT CATEGORIES (parking / fne / others)
+   ===================================================================== */
+const CATS={
+  parking:{list:'#parkList',tot:'#parkTot',title:'Parking',descHint:'e.g. MBI Ipoh, Perak Park'},
+  fne    :{list:'#fneList', tot:'#fneTot', title:'Food & Entertainment',descHint:'e.g. Lunch with Sdn Bhd XYZ'},
+  others :{list:'#othList', tot:'#othTot', title:'Other Item',descHint:'Describe the expense'}
+};
+function renderCat(cat){
+  const c=CATS[cat], arr=M()[cat], box=$(c.list);
+  $(c.tot).textContent = rm(sumBy(arr,r=>r.amount));
+  const rows=[...arr].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  if(!rows.length){ box.innerHTML=`<div class="empty">No ${esc(c.title.toLowerCase())} receipts yet.</div>`; return; }
+  box.innerHTML=rows.map(r=>`<div class="item">
+      <div class="top">
+        <div class="g">
+          <div class="t1">${esc(r.desc||'(no description)')}</div>
+          <div class="t2">${esc(dayLabel(r.date))}</div>
+        </div>
+        <div class="amt">${rm(r.amount)}</div>
+      </div>
+      <div class="iacts">
+        <button onclick="editRec('${cat}','${r.id}')">✎ Edit</button>
+        <button class="d" onclick="delRec('${cat}','${r.id}')">🗑 Delete</button>
+      </div></div>`).join('');
+}
+function editRec(cat,id){
+  const c=CATS[cat], arr=M()[cat];
+  const r = id ? arr.find(x=>x.id===id) : {id:uid(),date:defaultDate(),desc:'',amount:''};
+  const isNew=!id;
+  openSheet(`
+    <h3>${isNew?'New':'Edit'} ${esc(c.title)}<button onclick="closeSheet()">×</button></h3>
+    <div class="card">
+      <div class="row">
+        <div class="f"><label>Date</label><input id="r_date" type="date" value="${esc(r.date)}"></div>
+        <div class="f"><label>Amount (RM)</label>
+          <input id="r_amt" type="number" step="0.01" inputmode="decimal" value="${esc(r.amount)}" placeholder="0.00"></div>
+      </div>
+      <div class="f"><label>Description</label>
+        <input id="r_desc" type="text" value="${esc(r.desc)}" placeholder="${esc(c.descHint)}"></div>
+    </div>
+    <div id="r_err"></div>
+    <div class="btns">
+      <button class="btn gry" onclick="closeSheet()">Cancel</button>
+      <button class="btn" onclick="saveRec('${cat}','${r.id}',${isNew})">Save</button>
+    </div>`);
+  window._draft=JSON.parse(JSON.stringify(r));
+}
+
+function saveRec(cat,id,isNew){
+  const d=window._draft;
+  d.date=$('#r_date').value; d.desc=$('#r_desc').value.trim(); d.amount=$('#r_amt').value;
+  const errs=[];
+  if(!d.date) errs.push('Date is required.');
+  else if(d.date.slice(0,7)!==S.cur) errs.push('Date is outside '+monthLabel(S.cur)+'.');
+  if(!(num(d.amount)>0)) errs.push('Amount must be more than zero.');
+  if(!d.desc) errs.push('Description is required.');
+  if(errs.length){ $('#r_err').innerHTML='<div class="err">'+errs.map(esc).join('<br>')+'</div>'; return; }
+  const arr=M()[cat];
+  if(isNew) arr.push(d); else arr[arr.findIndex(x=>x.id===id)]=d;
+  save(); closeSheet(); renderAll(); toast('Saved');
+}
+function delRec(cat,id){
+  if(!confirm('Delete this item?')) return;
+  const arr=M()[cat]; const i=arr.findIndex(x=>x.id===id);
+  arr.splice(i,1); save(); renderAll();
+}
+
+/* =====================================================================
+   SUMMARY + FORM OUTPUT
+   ===================================================================== */
+function renderSummary(){
+  const t=totals();
+  $('#sumTable').innerHTML=`
+    <tr><td>Mileage — ${t.km.toLocaleString()} km × ${money(t.rate)}</td><td>${money(t.mil)}</td></tr>
+    <tr><td>Toll claim</td><td>${money(t.toll)}</td></tr>
+    <tr><td>Parking</td><td>${money(t.park)}</td></tr>
+    <tr><td>Foods &amp; Entertainment</td><td>${money(t.fne)}</td></tr>
+    <tr><td>Others</td><td>${money(t.oth)}</td></tr>
+    <tr><td>TOTAL CLAIM</td><td>${rm(t.grand)}</td></tr>`;
+}
+
+/* Fit a set of items into the fixed number of numbered lines on the paper
+   form; anything beyond the last line is merged into it. */
+function fitLines(items,max){
+  if(items.length<=max) return items.slice();
+  const head=items.slice(0,max-1);
+  const rest=items.slice(max-1);
+  head.push({ date:'', desc:`Other ${rest.length} items (see attached receipts)`,
+              amount:sumBy(rest,r=>r.amount) });
+  return head;
+}
+function block(items,minLines){
+  const lines=items.map((r,i)=>`<div class="li"><div class="no">${i+1})</div><div class="tx">${esc(r.desc)}</div></div>`);
+  const dates=items.map(r=>`<div>${esc(r.date?dmy(r.date):'')}</div>`);
+  const amts =items.map(r=>`<div>${money(r.amount)}</div>`);
+  for(let i=items.length;i<minLines;i++){
+    lines.push(`<div class="li"><div class="no">${i+1})</div><div class="tx">&nbsp;</div></div>`);
+    dates.push('<div>&nbsp;</div>'); amts.push('<div>&nbsp;</div>');
+  }
+  return {lines:lines.join(''),dates:dates.join(''),amts:amts.join('')};
+}
+
+function claimFormPage(){
+  const m=M(), t=totals();
+  const name=S.profile.name||'', mon=monthLabel(S.cur);
+
+  const tollTrips=m.trips.filter(x=>x.toll).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const tollItems=fitLines(tollTrips.map(x=>({
+    date:x.date,
+    desc:`${x.tollFrom||'?'} - ${x.tollTo||'?'} (${num(x.tollWay)===2?'2 way':'1 way'})`,
+    amount:tollOf(x)})),4);
+  const parkItems=fitLines([...m.parking].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
+    .map(r=>({date:r.date,desc:r.desc,amount:num(r.amount)})),4);
+  const fneItems =fitLines([...m.fne].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
+    .map(r=>({date:r.date,desc:r.desc,amount:num(r.amount)})),7);
+  const othItems =fitLines([...m.others].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
+    .map(r=>({date:r.date,desc:r.desc,amount:num(r.amount)})),6);
+
+  const B={toll:block(tollItems,1),park:block(parkItems,1),fne:block(fneItems,7),oth:block(othItems,6)};
+  const sect=(title,b,total)=>`
+    <tr>
+      <td class="cf-desc"><div class="sect">${title}</div>${b.lines}</td>
+      <td class="cf-unit"><div class="stack"><div>&nbsp;</div>${b.dates}</div></td>
+      <td class="cf-amt"><div class="stack"><div>&nbsp;</div>${b.amts}</div>
+          <div class="sub">${money(total)}</div></td>
+    </tr>`;
+
+  return `<div class="page">
+    <div class="co">Ipoh Hydrotech <b>Engineering Sdn. Bhd.</b></div>
+    <div class="bar">CLAIM FORM</div>
+    <div class="hdrline"><div class="l">Employee's Name</div><div class="c">:</div><div class="v">${esc(name)}</div></div>
+    <div class="hdrline"><div class="l">Claim for the month of</div><div class="c">:</div><div class="v">${esc(mon)}</div></div>
+    <table class="form">
+      <tr><th class="cf-desc">DESCRIPTION</th><th class="cf-unit">UNIT / DATE<br>(RM)</th><th class="cf-amt">TOTAL (RM)</th></tr>
+      <tr>
+        <td class="cf-desc"><div class="sect">MILEAGE (KM) : ${t.km.toLocaleString('en-MY')}</div><div>&nbsp;</div></td>
+        <td class="cf-unit"><div>&nbsp;</div><b>${money(t.rate)}</b></td>
+        <td class="cf-amt"><div>&nbsp;</div><b>${money(t.mil)}</b></td>
+      </tr>
+      ${sect('TOL CLAIM',B.toll,t.toll)}
+      ${sect('PARKING',B.park,t.park)}
+      ${sect('FOODS &amp; ENTERTAINMENT',B.fne,t.fne)}
+      ${sect('OTHERS',B.oth,t.oth)}
+      <tr class="totrow"><td colspan="2" class="ct">TOTAL CLAIM</td><td class="cf-amt">${money(t.grand)}</td></tr>
+    </table>
+    <div class="sig">
+      <div>Employee's Signature<div class="ln">Date :</div></div>
+      <div>Approved By<div class="ln">Date :</div></div>
+    </div>
+  </div>`;
+}
+
+function mileagePages(){
+  const m=M(), t=totals();
+  const trips=[...m.trips].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const PER=11, pages=[];
+  const chunks = trips.length ? [] : [[]];
+  for(let i=0;i<trips.length;i+=PER) chunks.push(trips.slice(i,i+PER));
+
+  chunks.forEach((chunk,pi)=>{
+    const last = pi===chunks.length-1;
+    let rows='';
+    chunk.forEach(x=>{
+      /* One line per customer, and its reason on the matching line of Remarks.
+         Numbered when there is more than one, so the pairing survives wrapping. */
+      const vs=x.visits||[];
+      const n = vs.length>1;
+      const cust = vs.map((v,i)=>`<div>${n?(i+1)+'. ':''}${esc(v.customer)}</div>`).join('');
+      let rem   = vs.map((v,i)=>`<div>${n?(i+1)+'. ':''}${esc(v.reason)}</div>`).join('');
+      if(x.toll) rem+=`<div>Toll ${esc(x.tollFrom||'?')} - ${esc(x.tollTo||'?')} (${num(x.tollWay)===2?'2 way':'1 way'})</div>`;
+      rows+=`<tr>
+        <td class="ct">${esc(dmy(x.date))}</td>
+        <td>${esc(x.area)}</td>
+        <td class="rt">${num(x.startKm).toLocaleString()}</td>
+        <td class="rt">${num(x.endKm).toLocaleString()}</td>
+        <td class="rt">${tripKm(x).toLocaleString()}</td>
+        <td>${cust}</td>
+        <td>${rem}</td></tr>`;
+    });
+    for(let i=chunk.length;i<PER;i++)
+      rows+='<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+
+    pages.push(`<div class="page">
+      <div class="co">Ipoh Hydrotech <b>Engineering Sdn. Bhd.</b></div>
+      <div class="bar r">DAILY MILEAGE CLAIM</div>
+      <div class="hdrline"><div class="l">Employee's Name</div><div class="c">:</div><div class="v nb"><b>${esc(S.profile.name||'')}</b></div></div>
+      <div class="hdrline"><div class="l">Claim for the month of</div><div class="c">:</div><div class="v nb"><b>${esc(monthLabel(S.cur))}</b>${chunks.length>1?' &nbsp;&nbsp;(page '+(pi+1)+' of '+chunks.length+')':''}</div></div>
+      <table class="mil">
+        <tr><th rowspan="2" style="width:11%">Date</th><th rowspan="2" style="width:13%">Area</th>
+            <th colspan="3">Mileage (km)</th>
+            <th rowspan="2" style="width:22%">Customer</th><th rowspan="2" style="width:23%">Remarks</th></tr>
+        <tr><th style="width:10%">Start</th><th style="width:10%">End</th><th style="width:11%">Total</th></tr>
+        ${rows}
+        <tr><td colspan="4" class="ct" style="font-weight:bold">TOTAL CLAIM</td>
+            <td class="rt" style="font-weight:bold">${last?t.km.toLocaleString():''}</td>
+            <td></td><td></td></tr>
+      </table>
+      <div class="sig">
+        <div>Employee's Signature<div class="ln">Date :</div></div>
+        <div>Approved By<div class="ln">Date :</div></div>
+      </div>
+    </div>`);
+  });
+  return pages.join('');
+}
+
+async function buildOutput(doPrint){
+  const out=$('#out');
+  out.innerHTML = claimFormPage() + mileagePages();
+
+  if(doPrint){ setTimeout(()=>window.print(),350); }
+  else toast('Preview updated');
+}
+
+/* =====================================================================
+   SETTINGS / BACKUP
+   ===================================================================== */
+function openSettings(){
+  openSheet(`
+    <h3>Settings<button onclick="closeSheet()">×</button></h3>
+    <div class="card">
+      <div class="f"><label>Employee's name</label>
+        <input id="s_name" type="text" value="${esc(S.profile.name)}"></div>
+      <div class="f"><label>Vehicle / registration (optional)</label>
+        <input id="s_veh" type="text" value="${esc(S.profile.vehicle||'')}"></div>
+      <div class="f"><label>Mileage rate (RM per km)</label>
+        <input id="s_rate" type="number" step="0.01" inputmode="decimal" value="${esc(S.profile.rate)}"></div>
+      <button class="btn" onclick="saveSettings()">Save</button>
+    </div>
+    <div class="card">
+      <h2>Backup</h2>
+      <div class="btns">
+        <button class="btn sec" onclick="exportData()">⬇ Export backup</button>
+        <button class="btn gry" onclick="document.getElementById('impf').click()">⬆ Import</button>
+      </div>
+      <input type="file" id="impf" accept="application/json" style="display:none" onchange="importData(this)">
+      <div class="hint">The backup file contains every month plus all photos and PDFs.</div>
+    </div>
+    <div class="card">
+      <h2>Account</h2>
+      <div class="hint" style="margin:0 0 10px">
+        Signed in as <b>${esc(session?session.name:'—')}</b>${session?' ('+esc(session.role||'')+')':''}.
+        Your claims sync to your account, so they follow you to a new phone.</div>
+      <button class="btn gry keep" onclick="logout()">Sign out</button>
+    </div>
+    <div class="card">
+      <h2>Danger zone</h2>
+      <button class="btn del" onclick="clearMonth()">Clear ${esc(monthLabel(S.cur))}</button>
+    </div>`);
+}
+function saveSettings(){
+  S.profile.name=$('#s_name').value.trim();
+  S.profile.vehicle=$('#s_veh').value.trim();
+  S.profile.rate=num($('#s_rate').value)||0.40;
+  $('#fName').value=S.profile.name;
+  save(); closeSheet(); renderAll(); toast('Settings saved');
+}
+function clearMonth(){
+  if(!confirm('Delete ALL data for '+monthLabel(S.cur)+'? This cannot be undone.')) return;
+    S.months[S.cur]=blankMonth(); save(); closeSheet(); renderAll(); toast('Month cleared');
+}
+
+async function exportData(){
+  const pack={v:2, exported:new Date().toISOString(), state:S};
+  const blob=new Blob([JSON.stringify(pack)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`claim-backup-${S.cur}.json`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast('Backup downloaded');
+}
+async function importData(inp){
+  const f=inp.files[0]; if(!f) return;
+  if(!confirm('Import will REPLACE all data currently in this app. Continue?')) return;
+  try{
+    const pack=JSON.parse(await f.text());
+    S=pack.state; save(); closeSheet(); fillMonths(); renderAll(); toast('Backup restored');
+  }catch(e){ alert('Could not read that backup file.'); }
+  inp.value='';
+}
+
+/* =====================================================================
+   WIRING
+   ===================================================================== */
+const STOCK_REASONS=['Follow up quotation','Site visit / survey','Delivery','Collect payment',
+  'Service complaint','Technical discussion','Commissioning','Tender briefing','Courtesy visit'];
+
+function fillLists(){
+  const areas=new Set(),custs=new Set(),tolls=new Set(),reasons=new Set(STOCK_REASONS);
+  Object.values(S.months).forEach(m=>(m.trips||[]).forEach(t=>{
+    if(t.area) areas.add(t.area);
+    (t.visits||[]).forEach(v=>{ if(v.customer) custs.add(v.customer); if(v.reason) reasons.add(v.reason); });
+    if(t.tollFrom) tolls.add(t.tollFrom); if(t.tollTo) tolls.add(t.tollTo);
+  }));
+  /* Names typed on any device, by anyone — this is what makes the suggestions
+     follow the salesman to a new phone instead of starting empty. */
+  sharedLists.customers.forEach(c=>custs.add(c));
+  sharedLists.areas.forEach(a=>areas.add(a));
+  sharedLists.tolls.forEach(t=>tolls.add(t));
+  sharedLists.reasons.forEach(r=>reasons.add(r));
+  (S.profile.knownCustomers||[]).forEach(c=>custs.add(c));
+  (S.profile.knownAreas||[]).forEach(a=>areas.add(a));
+  const grew = (S.profile.knownCustomers||[]).length!==custs.size ||
+               (S.profile.knownAreas||[]).length!==areas.size;
+  S.profile.knownCustomers=[...custs].sort();
+  S.profile.knownAreas=[...areas].sort();
+  S.profile.knownTolls=[...tolls].sort();
+  S.profile.knownReasons=[...reasons].filter(r=>!STOCK_REASONS.includes(r)).sort();
+  if(grew) pushLists();
+  const fill=(el,set)=>document.querySelector(el).innerHTML=
+    [...set].sort().map(v=>`<option value="${esc(v)}">`).join('');
+  fill('#dlArea',areas); fill('#dlCust',custs); fill('#dlToll',tolls); fill('#dlReason',reasons);
+}
+function renderAll(){
+  $('#hTitle').textContent='Claim · '+monthLabel(S.cur);
+  renderTrips(); renderToll();
+  renderCat('parking'); renderCat('fne'); renderCat('others');
+  renderSummary(); fillLists();
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  $('#tab-'+b.dataset.t).classList.add('on');
+  window.scrollTo(0,0);
+  if(b.dataset.t==='out') buildOutput(false);
+});
+$('#fName').addEventListener('input',e=>{ S.profile.name=e.target.value; save(); });
+$('#fMonth').addEventListener('change',e=>{ S.cur=e.target.value; M(); save(); renderAll(); });
+
+/* =====================================================================
+   STARTUP
+   ===================================================================== */
+const MGMT_ROLES = ['management'];   // read-only access to everyone's claims
+
+async function startApp(){
+  $('#auth').classList.add('hidden');
+  readOnly = false;
+  viewUid  = session.uid;
+
+  load();                                   // local cache for this account
+  if(!S.profile.name) S.profile.name = session.salesman || session.name || '';
+  fillMonths();
+  $('#fName').value = S.profile.name;
+  renderAll();
+
+  watchSettings();
+  watchLists();
+
+  if(MGMT_ROLES.includes(session.role)){
+    await buildStaffPicker();               // management: pick whose claim to view
+  }else{
+    watchCloud(session.uid);
+  }
+}
+
+/* Management sees every salesman's claim, read-only — they approve on the
+   printed form, so nothing here should let them edit someone's numbers. */
+async function buildStaffPicker(){
+  const sel=$('#fStaff');
+  sel.style.display='';
+  $('#fName').style.display='none';
+  let users={};
+  try{ users=(await fb.users.once('value')).val()||{}; }catch(e){}
+  let claims={};
+  try{ claims=(await fb.db.ref(DB_ROOT).once('value')).val()||{}; }catch(e){}
+  const opts=Object.keys(claims).map(uid=>{
+    const u=users[uid]||{};
+    return { uid, name:u.salesman||u.name||u.email||uid };
+  }).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!opts.length){ sel.innerHTML='<option>No claims submitted yet</option>'; return; }
+  sel.innerHTML=opts.map(o=>`<option value="${esc(o.uid)}">${esc(o.name)}</option>`).join('');
+  sel.onchange=()=>viewStaff(sel.value);
+  viewStaff(opts[0].uid);
+}
+function viewStaff(uid){
+  viewUid=uid; readOnly=true;
+  dataRef(uid).off();
+  dataRef(uid).once('value').then(s=>{
+    const v=s.val()||{};
+    S.profile=v.profile||{name:'',rate:0.40};
+    S.months =v.months||{};
+    migrate(); M(); fillMonths(); renderAll();
+    applyReadOnly();
+  }).catch(()=>toast('Could not load that claim'));
+}
+/* Driven by a body class, not inline styles, so re-renders (switching month,
+   a cloud update landing) can't quietly restore the edit buttons. */
+function applyReadOnly(){ document.body.classList.toggle('ro', readOnly); }
+
+function boot(){
+  initFirebase();
+  const saved=sessionStorage.getItem('iht_claim_session');
+  if(saved){
+    try{ session=JSON.parse(saved); }catch(e){ session=null; }
+  }
+  if(session){ startApp(); }
+  else{
+    /* Not signed in — the login overlay is already covering the app. */
+    load(); fillMonths(); $('#fName').value=S.profile.name||''; renderAll();
+    if(!secureOk()) showInsecureHelp();          // say so before they try and fail
+    else setTimeout(()=>$('#loginEmail').focus(),200);
+  }
+}
+document.getElementById('loginPass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+boot();
+</script>
+</body>
+</html>
