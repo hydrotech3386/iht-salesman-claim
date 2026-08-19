@@ -871,16 +871,23 @@ function editTrip(id){
           <input id="e_e" type="number" inputmode="numeric" step="1" value="${esc(t.endKm)}"></div>
       </div>
       <div class="tot" style="margin:2px 0 10px"><span>Trip distance</span><span class="n" id="e_km">0 km</span></div>
-      <div class="filebar">
-        <label>📷 Photo of odometer<input type="file" accept="image/*" capture="environment" onchange="tripPhotos(this)" multiple></label>
-        <label>📁 Gallery<input type="file" accept="image/*" onchange="tripPhotos(this)" multiple></label>
+      <div class="row">
+        <div style="flex:1;min-width:0">
+          <label class="aibtn" style="display:block;text-align:center">✨ Read start
+            <input type="file" accept="image/*" style="display:none" onchange="readOdo('start',this)"></label>
+          <div class="airesult" id="odo-start"></div>
+          <div class="thumbs" id="ph-start"></div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <label class="aibtn" style="display:block;text-align:center">✨ Read end
+            <input type="file" accept="image/*" style="display:none" onchange="readOdo('end',this)"></label>
+          <div class="airesult" id="odo-end"></div>
+          <div class="thumbs" id="ph-end"></div>
+        </div>
       </div>
-      <div class="thumbs" id="e_ph" style="margin-top:10px"></div>
-      <button type="button" class="aibtn" id="aiBtn" onclick="readOdometer()" disabled>
-        ✨ Read the odometer from the photo</button>
-      <div class="airesult" id="aiOut"></div>
-      <div class="hint">Take one photo at the start and one at the end and the AI fills in both.
-        Always check the numbers against the photo — you are signing for them.</div>
+      <div class="hint">Photograph the odometer when you set off and again when you get back —
+        each button fills only its own box. Always check the number against the photo,
+        you are signing for it.</div>
     </div>
 
     <div class="card">
@@ -912,7 +919,7 @@ function editTrip(id){
   window._draft = JSON.parse(JSON.stringify(t));
   if(!window._draft.visits || !window._draft.visits.length)
     window._draft.visits=[{customer:'',reason:''}];
-  drawDraftPhotos(); drawVisits();
+  drawOdoShots(); drawVisits();
   const upd=()=>{ const d=num($('#e_e').value)-num($('#e_s').value);
     $('#e_km').textContent = (d>0?d:0).toLocaleString()+' km'; };
   $('#e_s').oninput=upd; $('#e_e').oninput=upd; upd();
@@ -958,14 +965,9 @@ const AI_MODEL = 'claude-opus-5';
 let appSettings = {};
 function watchSettings(){
   if(!fb.ready) return;
-  fb.db.ref('appSettings').on('value', s=>{ appSettings=s.val()||{}; refreshAiBtns(); }, ()=>{});
+  fb.db.ref('appSettings').on('value', s=>{ appSettings=s.val()||{}; }, ()=>{});
 }
 function aiKey(){ return appSettings.claudeApiKey || localStorage.getItem('iht_claude_key') || ''; }
-function refreshAiBtns(){
-  document.querySelectorAll('.aibtn').forEach(b=>{
-    b.disabled = !aiKey() || !shots.length;
-  });
-}
 
 /* ---------- shared call ---------- */
 async function askClaude(shotList, prompt, schema, maxTokens){
@@ -1368,44 +1370,51 @@ Rules:
 - Set "confident" to false if the photo is blurred, glared, cropped, or any digit is ambiguous.
 - If a photo shows no readable odometer, omit it from "readings" and explain briefly in "note".`;
 
-async function readOdometer(which){
-  const out=$('#aiOut');
-  if(!aiKey()){ out.innerHTML='<span style="color:var(--warn)">AI reading is not set up. Ask your admin to add the Claude API key in the Invoice Tracker.</span>'; return; }
-  if(!shots.length){ out.innerHTML='<span style="color:var(--warn)">Take a photo of the odometer first.</span>'; return; }
-  const btn=$('#aiBtn'); if(btn) btn.disabled=true;
-  out.innerHTML='⏳ Reading the odometer…';
-  try{
-    applyOdo(await askClaude(shots, ODO_PROMPT, ODO_SCHEMA, 2000), which);
-  }catch(err){
-    console.error(err);
-    out.innerHTML='<span style="color:var(--err)">Could not read it — '+esc(err.message)+'. Key the reading in manually.</span>';
-  }finally{ refreshAiBtns(); }
-}
-function applyOdo(parsed, which){
-  const out=$('#aiOut');
-  const rs=(parsed.readings||[]).filter(r=>Number.isFinite(r.km)&&r.km>0);
-  if(!rs.length){
-    out.innerHTML='<span style="color:var(--warn)">No odometer reading found'+
-      (parsed.note?' — '+esc(parsed.note):'')+'. Key it in manually.</span>';
+/* One photo, one box. The salesman says which reading they are taking, so
+   nothing has to be inferred from the order or size of the numbers. */
+async function readOdo(which, inp){
+  const out=$('#odo-'+which);
+  const added=await takeShots(inp);
+  if(!added.length) return;
+  const shot=added[added.length-1];
+  shot.which=which;
+  /* Re-shooting one side replaces that side's photo, never the other's. */
+  shots=shots.filter(s=>s===shot || s.which!==which);
+  drawOdoShots();
+
+  if(!aiKey()){
+    out.innerHTML='<span style="color:var(--warn)">AI is not set up — type the reading in.</span>';
     return;
   }
-  /* Two photos of one trip are start-then-end; a single photo fills whichever
-     box the salesman tapped. Always shown for confirmation, never silently used. */
-  let msg='';
-  if(rs.length>=2){
-    const a=Math.min(rs[0].km,rs[1].km), b=Math.max(rs[0].km,rs[1].km);
-    $('#e_s').value=a; $('#e_e').value=b;
-    msg=`Filled in start <b>${a.toLocaleString()}</b> and end <b>${b.toLocaleString()}</b>`;
-  }else{
-    const t = which==='end' ? '#e_e' : (!$('#e_s').value ? '#e_s' : '#e_e');
-    $(t).value=rs[0].km;
-    msg=`Filled in ${t==='#e_s'?'start':'end'} <b>${rs[0].km.toLocaleString()}</b>`;
+  out.innerHTML='⏳ Reading…';
+  try{
+    const parsed=await askClaude([shot], ODO_PROMPT, ODO_SCHEMA, 2000);
+    const r=(parsed.readings||[]).filter(x=>Number.isFinite(x.km)&&x.km>0)[0];
+    if(!r){
+      out.innerHTML='<span style="color:var(--warn)">Couldn\'t read it'+
+        (parsed.note?' — '+esc(parsed.note):'')+'. Type it in.</span>';
+      return;
+    }
+    $(which==='start'?'#e_s':'#e_e').value=r.km;
+    $('#e_s').dispatchEvent(new Event('input'));
+    out.innerHTML='<span style="color:'+(r.confident?'var(--ok)':'var(--warn)')+'">'
+      + (r.confident?'✓ ':'⚠ ') + r.km.toLocaleString()
+      + (r.confident?' — check it' : ' — digits unclear, check carefully') + '</span>';
+  }catch(err){
+    console.error(err);
+    out.innerHTML='<span style="color:var(--err)">'+esc(err.message)+' — type it in.</span>';
   }
-  $('#e_s').dispatchEvent(new Event('input'));
-  const shaky=rs.some(r=>!r.confident);
-  out.innerHTML=`<span style="color:${shaky?'var(--warn)':'var(--ok)'}">${shaky?'⚠':'✓'} ${msg}. `+
-    (shaky?'Some digits were hard to read — please check against the photo.'
-          :'Please check it against the photo before saving.')+'</span>';
+}
+function drawOdoShots(){
+  ['start','end'].forEach(w=>{
+    const box=document.getElementById('ph-'+w); if(!box) return;
+    box.innerHTML='';
+    const s=shots.find(x=>x.which===w); if(!s) return;
+    const im=document.createElement('img'); im.className='thumb'; im.src=s.url;
+    im.title='Tap to view full size';
+    im.onclick=()=>window.open(s.url,'_blank');
+    box.appendChild(im);
+  });
 }
 function setWay(w){ window._draft.tollWay=w;
   $('#w1').classList.toggle('on',w===1); $('#w2').classList.toggle('on',w===2); }
@@ -1418,21 +1427,6 @@ function defaultDate(){
 function lastEndKm(){
   const ts=[...M().trips].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   return ts.length ? ts[ts.length-1].endKm : '';
-}
-async function tripPhotos(inp){
-  await takeShots(inp);
-  drawDraftPhotos(); refreshAiBtns();
-}
-function drawDraftPhotos(){
-  const box=$('#e_ph'); if(!box) return; box.innerHTML='';
-  shots.forEach((s,i)=>{
-    const w=document.createElement('div'); w.style.position='relative';
-    const im=document.createElement('img'); im.className='thumb'; im.src=s.url; w.appendChild(im);
-    const x=document.createElement('button'); x.textContent='×';
-    x.style.cssText='position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:#c0392b;color:#fff;font-size:13px;line-height:1;padding:0';
-    x.onclick=()=>{ try{URL.revokeObjectURL(s.url);}catch(e){} shots.splice(i,1); drawDraftPhotos(); refreshAiBtns(); };
-    w.appendChild(x); box.appendChild(w);
-  });
 }
 function saveTrip(id,isNew){
   const d=window._draft;
