@@ -1255,12 +1255,17 @@ function openTngReview(rows, note){
 }
 function drawTng(){
   const box=$('#tngRows'); if(!box) return;
-  box.innerHTML=window._tng.map((g,gi)=>`
+  box.innerHTML=window._tng.map((g,gi)=>{
+    const why = g.trip ? tripRemark(g.trip) : '';
+    return `
     <div class="item">
       <div class="t1">${esc(dayLabel(g.date))}
         <span class="t2" style="font-weight:400">— ${g.trip
           ? '<span class="tag">TRIP</span>'+esc(g.trip.area||'')
           : '<b style="color:var(--warn)">no mileage trip</b>'}</span></div>
+      ${g.trip ? `<div class="t2" style="margin-top:2px">${why
+          ? 'Remarks: '+esc(why)
+          : '<b style="color:var(--warn)">That trip has no customer recorded</b>'}</div>` : ''}
       ${g.rows.map((r,ri)=>`
         <label class="chk" style="margin:8px 0 0">
           <input type="checkbox" ${r.take?'checked':''} onchange="tngTick(${gi},${ri},this.checked)">
@@ -1269,10 +1274,38 @@ function drawTng(){
             ${r.confident?'':'<b style="color:var(--warn)"> ⚠ check</b>'}</span>
           <b style="font-variant-numeric:tabular-nums">${rm(r.amount)}</b>
         </label>`).join('')}
-    </div>`).join('');
+      ${g.trip ? '' : `
+      <div id="why-${gi}" style="display:${g.rows.some(r=>r.take)?'':'none'};margin-top:10px">
+        <div class="row">
+          <div class="f" style="margin-bottom:0"><label>Customer visited</label>
+            <input type="text" list="dlCust" value="${esc(g.customer||'')}"
+              placeholder="Who did you see?" onchange="tngWhy(${gi},'customer',this.value)"></div>
+          <div class="f" style="margin-bottom:0"><label>Reason</label>
+            <input type="text" list="dlReason" value="${esc(g.reason||'')}"
+              placeholder="Why the trip?" onchange="tngWhy(${gi},'reason',this.value)"></div>
+        </div>
+        <div class="hint">No mileage trip on this date, so the claim form needs this.</div>
+      </div>`}
+    </div>`;}).join('');
   tngTotal();
 }
-function tngTick(gi,ri,v){ window._tng[gi].rows[ri].take=v; tngTotal(); }
+/* A toll line has to justify itself on the claim form just like a mileage
+   line does. When the crossing sits on a recorded trip the customer and
+   reason are already known, so reuse them; when it doesn't, the salesman
+   has to supply them. */
+function tripRemark(t){
+  return asArray(t.visits)
+    .filter(v=>v.customer||v.reason)
+    .map(v=>v.customer && v.reason ? v.customer+': '+v.reason : (v.customer||v.reason))
+    .join('; ');
+}
+function tngTick(gi,ri,v){
+  window._tng[gi].rows[ri].take=v;
+  tngTotal();
+  const box=document.getElementById('why-'+gi);
+  if(box) box.style.display = window._tng[gi].rows.some(r=>r.take) ? '' : 'none';
+}
+function tngWhy(gi,field,v){ window._tng[gi][field]=v.trim(); }
 function tngAll(v){ window._tng.forEach(g=>g.rows.forEach(r=>r.take=v)); drawTng(); }
 function tngTotal(){
   const el=$('#tngSum'); if(!el) return;
@@ -1281,6 +1314,17 @@ function tngTotal(){
 }
 function applyTng(){
   const m=M();
+  /* Nothing goes on a claim form unexplained — a standalone toll needs the
+     customer and reason a mileage trip would otherwise have supplied. */
+  const missing=window._tng.filter(g=>!g.trip && g.rows.some(r=>r.take)
+                                   && (!g.customer || !g.reason));
+  if(missing.length){
+    toast('Add the customer and reason for '+dayLabel(missing[0].date));
+    const el=document.getElementById('why-'+window._tng.indexOf(missing[0]));
+    if(el){ el.style.display=''; el.scrollIntoView({block:'center'});
+            const i=el.querySelector('input'); if(i) i.focus(); }
+    return;
+  }
   let onTrips=0, standalone=0;
   m.tollItems = asArray(m.tollItems);
   window._tng.forEach(g=>{
@@ -1290,9 +1334,10 @@ function applyTng(){
     const trip=g.trip && m.trips.find(x=>x.id===g.trip.id);
     if(trip){ trip.tollActual=sum; onTrips++; return; }
     /* No mileage trip behind it — claim it in its own right (company vehicle). */
-    const desc='Toll '+(take[0].entry||'?')+' to '+(take[0].exit||'?')
-             + (take.length>1 ? ' (+'+(take.length-1)+' more crossing'+(take.length>2?'s':'')+')' : '');
-    m.tollItems.push({ id:uid(), date:g.date, desc, amount:sum });
+    const route='Toll '+(take[0].entry||'?')+' to '+(take[0].exit||'?')
+              + (take.length>1 ? ' (+'+(take.length-1)+' more crossing'+(take.length>2?'s':'')+')' : '');
+    m.tollItems.push({ id:uid(), date:g.date, desc:route, amount:sum,
+                       customer:g.customer, reason:g.reason });
     standalone++;
   });
   dropShots(); save(); closeSheet(); renderAll();
@@ -1463,6 +1508,8 @@ function renderToll(){
             <div class="g">
               <div class="t1">${esc(dayLabel(r.date))}</div>
               <div class="t2">${esc(r.desc)}</div>
+              ${[r.customer,r.reason].filter(Boolean).length
+                ? '<div class="t2"><b>'+esc([r.customer,r.reason].filter(Boolean).join(': '))+'</b></div>' : ''}
             </div>
             <div class="amt">${rm(r.amount)}</div>
           </div>
@@ -1597,11 +1644,15 @@ function claimFormPage(){
 
   const tollTrips=m.trips.filter(x=>x.toll).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   const tollItems=fitLines([
-    ...tollTrips.map(x=>({
-      date:x.date,
-      desc:`${x.tollFrom||'?'} - ${x.tollTo||'?'} (${num(x.tollWay)===2?'2 way':'1 way'})`,
-      amount:tollOf(x)})),
-    ...asArray(m.tollItems).map(r=>({date:r.date, desc:r.desc, amount:num(r.amount)}))
+    ...tollTrips.map(x=>{
+      const why=tripRemark(x);          // reuse the trip's own customer + reason
+      return { date:x.date,
+        desc:`${x.tollFrom||'?'} - ${x.tollTo||'?'} (${num(x.tollWay)===2?'2 way':'1 way'})`
+             + (why?' - '+why:''),
+        amount:tollOf(x) };}),
+    ...asArray(m.tollItems).map(r=>{
+      const why=[r.customer,r.reason].filter(Boolean).join(': ');
+      return { date:r.date, desc:r.desc+(why?' - '+why:''), amount:num(r.amount) };})
   ].sort((a,b)=>(a.date||'').localeCompare(b.date||'')),4);
   const parkItems=fitLines([...m.parking].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
     .map(r=>({date:r.date,desc:r.desc,amount:num(r.amount)})),4);
