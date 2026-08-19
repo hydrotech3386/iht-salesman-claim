@@ -161,7 +161,7 @@ nav button .bdg{position:absolute;transform:translate(14px,-4px);background:var(
 .authbox .f{margin-bottom:12px}
 #authErr{font-size:13px;font-weight:600;color:var(--err);min-height:18px;margin-bottom:8px}
 #authErr.wait{color:var(--warn)}
-.syncbar{display:flex;align-items:center;gap:6px;font-size:11px;padding:4px 0 0;color:rgba(255,255,255,.85)}
+.syncbar{display:flex;align-items:center;gap:6px;font-size:11px;padding:4px 0 0;color:rgba(255,255,255,.85);cursor:pointer}
 .dot{width:7px;height:7px;border-radius:50%;background:#8fdca8;flex:none}
 .dot.off{background:#f0a04b}
 .dot.err{background:#ff8a80}
@@ -283,7 +283,7 @@ table.mil td{height:30px;vertical-align:top}
     <input id="fName" type="text" placeholder="Employee's name" autocomplete="name">
     <select id="fMonth" style="max-width:150px"></select>
   </div>
-  <div class="syncbar"><span class="dot" id="syncDot"></span><span id="syncTxt">Connecting…</span></div>
+  <div class="syncbar" onclick="syncDetail()"><span class="dot" id="syncDot"></span><span id="syncTxt">Connecting…</span></div>
 </header>
 
 <main>
@@ -511,7 +511,18 @@ function initFirebase(){
       if(pushErr) setSync('err','Not saving — '+pushErr);
       else setSync(connected?'ok':'off');
     });
-  }catch(e){ console.error('firebase init failed', e); setSync('err'); }
+  }catch(e){ console.error('firebase init failed', e);
+              setSync('err','Firebase failed to load — hard-refresh'); }
+}
+function syncDetail(){
+  const bits=[
+    'Connection: '+(connected?'online':'offline'),
+    'Signed in to Firebase: '+((fb.ready&&firebase.auth().currentUser)?'yes':'no'),
+    authFail ? 'Sign-in problem: '+authFail : null,
+    pushErr  ? 'Last save error: '+pushErr  : null,
+    (!authFail&&!pushErr&&connected) ? 'Everything is saving normally.' : null
+  ].filter(Boolean);
+  alert(bits.join('\n'));
 }
 function setSync(state,msg){
   const d=$('#syncDot'), t=$('#syncTxt'); if(!d) return;
@@ -685,7 +696,13 @@ function watchCloud(uid){
     try{ localStorage.setItem(cacheKey(), JSON.stringify(S)); }catch(e){}
     $('#fName').value=S.profile.name||'';
     renderAll();
-  }, e=>{ console.warn('watch failed',e); setSync('err'); });
+  }, e=>{
+    const why=(e&&(e.code||e.message))||'read failed';
+    console.warn('watch failed',e);
+    setSync('err', /permission/i.test(why)
+      ? 'Not syncing — signed out. Pull down to refresh.'
+      : 'Not syncing — '+why);
+  });
 }
 
 /* Shared customer / area lists — so a name typed on one phone is offered on
@@ -1863,6 +1880,31 @@ $('#fMonth').addEventListener('change',e=>{ S.cur=e.target.value; M(); save(); r
    ===================================================================== */
 const MGMT_ROLES = ['management'];   // read-only access to everyone's claims
 
+/* Firebase restores its own anonymous user asynchronously, and on a reload the
+   app's session comes back from sessionStorage before that has settled. Reading
+   before then hits rules that require auth != null and fails. So wait for the
+   auth state, and re-establish it if it did not survive. */
+function authSettled(){
+  return new Promise(res=>{
+    let done=false;
+    const un=firebase.auth().onAuthStateChanged(u=>{ if(done) return; done=true; un(); res(u); });
+    setTimeout(()=>{ if(!done){ done=true; res(firebase.auth().currentUser); } }, 4000);
+  });
+}
+async function ensureAuth(){
+  if(!fb.ready) return false;
+  try{
+    if(await authSettled()) return true;
+    await firebase.auth().signInAnonymously();
+    authFail=null;
+    return true;
+  }catch(e){
+    authFail=(e&&(e.code||e.message))||'sign-in failed';
+    console.warn('anonymous auth unavailable:', authFail);
+    return false;
+  }
+}
+
 async function startApp(){
   $('#auth').classList.add('hidden');
   readOnly = false;
@@ -1873,6 +1915,8 @@ async function startApp(){
   fillMonths();
   $('#fName').value = S.profile.name;
   renderAll();
+
+  await ensureAuth();          // must precede any read, or the rules reject it
 
   watchSettings();
   watchLists();
