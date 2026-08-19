@@ -44,6 +44,8 @@ header{
   flex:1;min-width:0;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
   color:#fff;border-radius:8px;padding:7px 9px;font-size:13px
 }
+.whoami{flex:1;min-width:0;color:#fff;font-size:13.5px;font-weight:700;
+  padding:8px 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The global focus style paints a field white — right against the pale form
    background, invisible here in the navy header where the text is white too.
    A select keeps focus after you pick an option, so this stays on screen. */
@@ -302,7 +304,7 @@ table.mil td{height:30px;vertical-align:top}
   </div>
   <div class="hmeta">
     <select id="fStaff" style="display:none"></select>
-    <input id="fName" type="text" placeholder="Employee's name" autocomplete="name">
+    <div id="fName" class="whoami"></div>
     <select id="fMonth" style="max-width:150px"></select>
   </div>
   <div class="syncbar" onclick="syncDetail()"><span class="dot" id="syncDot"></span><span id="syncTxt">Connecting…</span></div>
@@ -716,7 +718,7 @@ function watchCloud(uid){
     S.months  = v.months||{};
     migrate(); M();
     try{ localStorage.setItem(cacheKey(), JSON.stringify(S)); }catch(e){}
-    $('#fName').value=S.profile.name||'';
+    $('#fName').textContent=S.profile.name||'';
     renderAll();
   }, e=>{
     const why=(e&&(e.code||e.message))||'read failed';
@@ -1791,7 +1793,7 @@ function openSettings(){
   openSheet(`
     <h3>Settings<button onclick="closeSheet()">×</button></h3>
     <div class="card">
-      <div class="f"><label>Employee's name</label>
+      <div class="f"><label>Employee's name (as printed on the claim form)</label>
         <input id="s_name" type="text" value="${esc(S.profile.name)}"></div>
       <div class="f"><label>Vehicle / registration (optional)</label>
         <input id="s_veh" type="text" value="${esc(S.profile.vehicle||'')}"></div>
@@ -1825,7 +1827,7 @@ function saveSettings(){
   S.profile.name=$('#s_name').value.trim();
   S.profile.vehicle=$('#s_veh').value.trim();
   S.profile.rate=num($('#s_rate').value)||0.40;
-  $('#fName').value=S.profile.name;
+  $('#fName').textContent=S.profile.name;
   save(); closeSheet(); renderAll(); toast('Settings saved');
 }
 function clearMonth(){
@@ -1897,7 +1899,6 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   window.scrollTo(0,0);
   if(b.dataset.t==='out') buildOutput(false);
 });
-$('#fName').addEventListener('input',e=>{ S.profile.name=e.target.value; save(); });
 $('#fMonth').addEventListener('change',e=>{ S.cur=e.target.value; M(); save(); renderAll(); });
 
 /* =====================================================================
@@ -1938,7 +1939,7 @@ async function startApp(){
   load();                                   // local cache for this account
   if(!S.profile.name) S.profile.name = session.salesman || session.name || '';
   fillMonths();
-  $('#fName').value = S.profile.name;
+  $('#fName').textContent = S.profile.name;
   renderAll();
 
   await ensureAuth();          // must precede any read, or the rules reject it
@@ -2024,7 +2025,7 @@ function boot(){
   if(session){ startApp(); }
   else{
     /* Not signed in — the login overlay is already covering the app. */
-    load(); fillMonths(); $('#fName').value=S.profile.name||''; renderAll();
+    load(); fillMonths(); $('#fName').textContent=S.profile.name||''; renderAll();
     if(!secureOk()) showInsecureHelp();          // say so before they try and fail
     else setTimeout(()=>$('#loginEmail').focus(),200);
   }
