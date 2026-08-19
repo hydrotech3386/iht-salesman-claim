@@ -1012,10 +1012,10 @@ const RECEIPT_SCHEMA = {
       date:{type:'string', description:'Receipt date as YYYY-MM-DD, or "" if not shown.'},
       amount:{type:'number', description:'Total actually paid, in ringgit.'},
       vendor:{type:'string', description:'Business name printed on the receipt, or "".'},
-      handwritten:{type:'string', description:'Any handwritten note on the receipt, transcribed verbatim. "" if none.'},
-      description:{type:'string', description:'Short claim-form description.'},
+      description:{type:'string', description:'What the expense was, from the printed receipt.'},
+      remarks:{type:'string', description:'Handwriting added by the salesman — customer and/or reason. Verbatim. "" if none.'},
       confident:{type:'boolean', description:'False if the date or amount is unclear.'}
-    }, required:['date','amount','vendor','handwritten','description','confident'],
+    }, required:['date','amount','vendor','description','remarks','confident'],
        additionalProperties:false } },
     note:{ type:'string', description:'Short reason if a photo could not be read; "" otherwise.' }
   },
@@ -1036,9 +1036,10 @@ For each receipt:
 - "amount" is the TOTAL actually paid, as a number in ringgit. If the receipt shows a subtotal, service charge, SST and a total, take the final total. Never add the receipts together.
 - "date" is the transaction date as YYYY-MM-DD. Malaysian receipts are usually DD/MM/YYYY — read 03/08/2026 as 2026-08-03, never as 3 August in American order. Use "" if no date is printed.
 - "vendor" is the business name printed on the receipt.
-- "handwritten" is any handwriting the salesman has added — typically a customer or company name, or the reason for the expense. Transcribe it exactly as written, and leave it "" if there is none. This is important: it is how the claim is justified.
-- "description" is a short line for the claim form. When there is handwriting, lead with it, because that is what identifies the claim — e.g. "Lunch with Perak Water Sdn Bhd", "Parking - site visit Taiping". When there is none, describe the expense from the vendor, e.g. "Parking - MBI Ipoh".
+- "description" is a short line saying WHAT the expense was, taken from the printed receipt — the vendor and the kind of purchase. For example "Lunch - Restoran Seri Mutiara", "Parking - MBI Ipoh", "Printing - Calibra Enterprise". Do not put the salesman's handwriting in here.
+- "remarks" is WHO and WHY: any handwriting the salesman has added to the receipt, typically a customer or company name and/or the reason for the expense. Transcribe it exactly as written, expanding nothing and inventing nothing. Leave it "" if the receipt carries no handwriting. This is how the claim is justified, so getting it right matters.
 - Set "confident" to false if the date or the amount is blurred, cropped or ambiguous.
+- The photo may be rotated sideways or upside down — read it in whatever orientation it is in.
 
 Read only what is actually printed or written. Do not invent a date or an amount, and do not guess a customer name that is not on the receipt. If a photo shows no readable receipt, leave it out of "receipts" and say why in "note".`;
 }
@@ -1047,7 +1048,7 @@ async function scanReceipts(cat, inp){
   const added = await takeShots(inp);
   if(!added.length) return;
   if(!aiKey()){
-    openReview(cat, added.map(()=>({date:defaultDate(),amount:'',description:'',handwritten:'',confident:true})), true);
+    openReview(cat, added.map(()=>({date:defaultDate(),amount:'',description:'',remarks:'',confident:true})), true);
     return;
   }
   openScanning(added.length);
@@ -1056,8 +1057,8 @@ async function scanReceipts(cat, inp){
     const rows=(parsed.receipts||[]).map(r=>({
       date: /^\d{4}-\d{2}-\d{2}$/.test(r.date||'') ? r.date : defaultDate(),
       amount: Number(r.amount)||'',
-      description: (r.description||r.handwritten||r.vendor||'').trim(),
-      handwritten: (r.handwritten||'').trim(),
+      description: (r.description||r.vendor||'').trim(),
+      remarks: (r.remarks||'').trim(),          // prefilled from the handwriting
       confident: r.confident!==false
     }));
     if(!rows.length){
@@ -1071,7 +1072,7 @@ async function scanReceipts(cat, inp){
     closeSheet();
     if(err.message==='no-key') toast('AI is not set up — enter the details manually');
     else toast('Could not read it: '+err.message);
-    openReview(cat, added.map(()=>({date:defaultDate(),amount:'',description:'',handwritten:'',confident:true})), true);
+    openReview(cat, added.map(()=>({date:defaultDate(),amount:'',description:'',remarks:'',confident:true})), true);
   }
 }
 function openScanning(n){
@@ -1106,7 +1107,7 @@ function drawReview(){
   box.innerHTML=window._rev.map((r,i)=>`
     <div class="item" style="${r.confident?'':'border-color:#f0c9a0;background:#fffdf8'}">
       ${r.confident?'':'<div class="t2" style="color:var(--warn);font-weight:700;margin-bottom:6px">⚠ Hard to read — please check</div>'}
-      ${r.handwritten?`<div class="t2" style="margin-bottom:6px">Your note: <b>${esc(r.handwritten)}</b></div>`:''}
+
       <div class="row">
         <div class="f" style="margin-bottom:8px"><label>Date</label>
           <input type="date" value="${esc(r.date)}" onchange="window._rev[${i}].date=this.value"></div>
@@ -1116,6 +1117,11 @@ function drawReview(){
       </div>
       <div class="f" style="margin-bottom:8px"><label>Description</label>
         <input type="text" value="${esc(r.description)}" onchange="window._rev[${i}].description=this.value"></div>
+      <div class="f" style="margin-bottom:8px">
+        <label>Remarks — customer and/or reason${r.remarks?' (read from your handwriting)':''}</label>
+        <input type="text" list="dlCust" value="${esc(r.remarks||'')}"
+          placeholder="e.g. Perak Water Sdn Bhd - discuss tender"
+          onchange="window._rev[${i}].remarks=this.value"></div>
       <div class="iacts"><button class="d" onclick="dropReview(${i})">🗑 Not a claim</button></div>
     </div>`).join('');
 }
@@ -1128,7 +1134,8 @@ function commitReview(cat){
   if(bad.length){ toast('Every line needs an amount and a description'); return; }
   const arr = cat==='toll' ? null : M()[cat];
   window._rev.forEach(r=>{
-    const rec={ id:uid(), date:r.date, desc:r.description.trim(), amount:Number(r.amount) };
+    const rec={ id:uid(), date:r.date, desc:r.description.trim(), amount:Number(r.amount),
+                remarks:(r.remarks||'').trim() };
     if(arr) arr.push(rec);
   });
   const n=window._rev.length;
@@ -1532,6 +1539,7 @@ function renderCat(cat){
       <div class="top">
         <div class="g">
           <div class="t1">${esc(r.desc||'(no description)')}</div>
+          ${r.remarks?`<div class="t2"><b>${esc(r.remarks)}</b></div>`:''}
           <div class="t2">${esc(dayLabel(r.date))}</div>
         </div>
         <div class="amt">${rm(r.amount)}</div>
@@ -1543,7 +1551,7 @@ function renderCat(cat){
 }
 function editRec(cat,id){
   const c=CATS[cat], arr=M()[cat];
-  const r = id ? arr.find(x=>x.id===id) : {id:uid(),date:defaultDate(),desc:'',amount:''};
+  const r = id ? arr.find(x=>x.id===id) : {id:uid(),date:defaultDate(),desc:'',amount:'',remarks:''};
   const isNew=!id;
   openSheet(`
     <h3>${isNew?'New':'Edit'} ${esc(c.title)}<button onclick="closeSheet()">×</button></h3>
@@ -1555,6 +1563,9 @@ function editRec(cat,id){
       </div>
       <div class="f"><label>Description</label>
         <input id="r_desc" type="text" value="${esc(r.desc)}" placeholder="${esc(c.descHint)}"></div>
+      <div class="f"><label>Remarks — customer and/or reason</label>
+        <input id="r_rem" type="text" list="dlCust" value="${esc(r.remarks||'')}"
+          placeholder="e.g. Perak Water Sdn Bhd - discuss tender"></div>
     </div>
     <div id="r_err"></div>
     <div class="btns">
@@ -1567,6 +1578,7 @@ function editRec(cat,id){
 function saveRec(cat,id,isNew){
   const d=window._draft;
   d.date=$('#r_date').value; d.desc=$('#r_desc').value.trim(); d.amount=$('#r_amt').value;
+  d.remarks=$('#r_rem').value.trim();
   const errs=[];
   if(!d.date) errs.push('Date is required.');
   else if(d.date.slice(0,7)!==S.cur) errs.push('Date is outside '+monthLabel(S.cur)+'.');
@@ -1635,11 +1647,11 @@ function claimFormPage(){
       return { date:r.date, desc:r.desc+(why?' - '+why:''), amount:num(r.amount) };})
   ].sort((a,b)=>(a.date||'').localeCompare(b.date||'')),4);
   const parkItems=fitLines([...m.parking].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
-    .map(r=>({date:r.date,desc:r.desc,amount:num(r.amount)})),4);
+    .map(r=>({date:r.date, desc:r.desc+(r.remarks?' - '+r.remarks:''), amount:num(r.amount)})),4);
   const fneItems =fitLines([...m.fne].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
-    .map(r=>({date:r.date,desc:r.desc,amount:num(r.amount)})),7);
-  const othItems =fitLines([...m.others].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
-    .map(r=>({date:r.date,desc:r.desc,amount:num(r.amount)})),6);
+    .map(r=>({date:r.date, desc:r.desc+(r.remarks?' - '+r.remarks:''), amount:num(r.amount)})),7);
+  const othItems=fitLines([...m.others].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
+    .map(r=>({date:r.date, desc:r.desc+(r.remarks?' - '+r.remarks:''), amount:num(r.amount)})),6);
 
   const B={toll:block(tollItems,1),park:block(parkItems,1),fne:block(fneItems,7),oth:block(othItems,6)};
   const sect=(title,b,total)=>`
