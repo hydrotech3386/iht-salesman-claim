@@ -172,8 +172,7 @@ body.ro .iacts,
 body.ro .filebar,
 body.ro .aibtn,
 body.ro .vrow .vx,
-body.ro #tollTrips input,
-body.ro #tollInvAmt { display:none!important }
+body.ro #tollTrips input
 body.ro #tab-out .btn{ display:block!important }   /* printing stays available */
 body.ro input,body.ro select,body.ro textarea{ pointer-events:none;background:#f2f4f7 }
 body.ro #fStaff,body.ro #fMonth,body.ro #tab-out input{ pointer-events:auto;background:'' }
@@ -317,17 +316,6 @@ table.mil td{height:30px;vertical-align:top}
   </div>
 
   <div id="tollItems"></div>
-
-  <div class="card">
-    <h2>Cross-check</h2>
-    <div class="hint" style="margin-bottom:10px">Filled in automatically when you scan a
-      statement. Shows how much of it you are claiming and how much you left out.</div>
-    <div class="f" style="margin-top:10px">
-      <label>Statement total (RM)</label>
-      <input id="tollInvAmt" type="number" step="0.01" inputmode="decimal" placeholder="0.00">
-    </div>
-    <div id="tollCheck"></div>
-  </div>
 </section>
 
 <!-- ================= PARKING ================= -->
@@ -436,7 +424,7 @@ const esc   = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 /* ---------------- state ---------------- */
 let S = { profile:{name:'', rate:0.40, vehicle:''}, months:{}, cur:'' };
 
-function blankMonth(){ return {trips:[],tollItems:[],tollInvAmt:'',parking:[],fne:[],others:[]}; }
+function blankMonth(){ return {trips:[],tollItems:[],parking:[],fne:[],others:[]}; }
 const MONTH_LISTS=['trips','tollItems','parking','fne','others'];
 
 /* Realtime Database does not store empty arrays, and it hands a sparse array
@@ -450,7 +438,6 @@ function asArray(v){
 function normMonth(m){
   if(!m || typeof m!=='object') m=blankMonth();
   MONTH_LISTS.forEach(k=>{ m[k]=asArray(m[k]); });
-  if(typeof m.tollInvAmt!=='string' && typeof m.tollInvAmt!=='number') m.tollInvAmt='';
   return m;
 }
 function normAll(){
@@ -1327,9 +1314,6 @@ function applyTng(){
   }
   let onTrips=0, standalone=0;
   m.tollItems = asArray(m.tollItems);
-  /* Every crossing read, claimed or not — the figure the reconciliation needs. */
-  m.tollInvAmt = String(window._tng.reduce((s,g)=>
-    s + g.rows.reduce((a,r)=>a+(Number(r.amount)||0),0), 0).toFixed(2));
   window._tng.forEach(g=>{
     const take=g.rows.filter(r=>r.take);
     if(!take.length) return;
@@ -1520,21 +1504,6 @@ function renderToll(){
         </div>`).join('')}
       <div class="hint">Company vehicle, no outstation trip recorded for that date.</div>
     </div>`;
-  /* Claiming less than the statement is the normal case — personal crossings
-     are meant to be left out. So reconcile, and only raise a flag for the one
-     case that is actually wrong: claiming MORE than the statement shows. */
-  $('#tollInvAmt').value = m.tollInvAmt ?? '';
-  const stmt=num(m.tollInvAmt), unclaimed=stmt-t.toll;
-  $('#tollCheck').innerHTML = !stmt ? '' : `
-    <table class="sum" style="margin-top:10px">
-      <tr><td>Statement total</td><td>${money(stmt)}</td></tr>
-      <tr><td>Claiming</td><td>${money(t.toll)}</td></tr>
-      <tr><td>${unclaimed>=0?'Not claimed (personal)':'Over-claimed'}</td>
-          <td style="color:${unclaimed>=-0.005?'var(--muted)':'var(--err)'}">${money(Math.abs(unclaimed))}</td></tr>
-    </table>
-    ${unclaimed < -0.005
-      ? '<div class="hint" style="font-weight:700;color:var(--err)">⚠ You are claiming more toll than the statement shows — check the amounts.</div>'
-      : '<div class="hint">Leaving personal crossings out is expected, so this gap is normal.</div>'}`;
 }
 function setTollAmt(id,v){
   const t=M().trips.find(x=>x.id===id); if(!t) return;
@@ -1543,7 +1512,6 @@ function setTollAmt(id,v){
   else t.tollRate=v;
   save(); renderAll();
 }
-$('#tollInvAmt').addEventListener('input',e=>{ M().tollInvAmt=e.target.value; save(); renderToll(); });
 
 
 
