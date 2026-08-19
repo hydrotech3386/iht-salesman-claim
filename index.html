@@ -184,10 +184,13 @@ body.ro .iacts,
 body.ro .filebar,
 body.ro .aibtn,
 body.ro .vrow .vx,
-body.ro #tollTrips input
+body.ro #tollTrips input { display:none!important }
 body.ro #tab-out .btn{ display:block!important }   /* printing stays available */
-body.ro input,body.ro select,body.ro textarea{ pointer-events:none;background:#f2f4f7 }
-body.ro #fStaff,body.ro #fMonth,body.ro #tab-out input{ pointer-events:auto;background:'' }
+/* Lock the claim's own fields, but never the header controls — those are how
+   management chooses whose claim and which month to look at, so scope this to
+   main rather than every input on the page. */
+body.ro main input,body.ro main select,body.ro main textarea{
+  pointer-events:none;background:#f2f4f7 }
 body.ro .roflag{display:block}
 .roflag{display:none;background:#fdecd8;color:var(--warn);border:1px solid #f0c9a0;
   border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:700;margin-bottom:10px}
