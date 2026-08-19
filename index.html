@@ -44,6 +44,13 @@ header{
   flex:1;min-width:0;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
   color:#fff;border-radius:8px;padding:7px 9px;font-size:13px
 }
+/* The global focus style paints a field white — right against the pale form
+   background, invisible here in the navy header where the text is white too.
+   A select keeps focus after you pick an option, so this stays on screen. */
+.hmeta input:focus,.hmeta select:focus{
+  background:rgba(255,255,255,.3);color:#fff;
+  outline:2px solid rgba(255,255,255,.85);outline-offset:-1px
+}
 .hmeta input::placeholder{color:rgba(255,255,255,.7)}
 .hmeta select option{color:#000}
 
