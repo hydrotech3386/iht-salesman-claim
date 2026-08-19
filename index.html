@@ -316,6 +316,8 @@ table.mil td{height:30px;vertical-align:top}
       charge on the trip for that date. Reloads and top-ups are ignored.</div>
   </div>
 
+  <div id="tollItems"></div>
+
   <div class="card">
     <h2>Cross-check</h2>
     <div class="hint" style="margin-bottom:10px">Photograph the monthly toll statement and the AI
@@ -434,8 +436,8 @@ const esc   = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 /* ---------------- state ---------------- */
 let S = { profile:{name:'', rate:0.40, vehicle:''}, months:{}, cur:'' };
 
-function blankMonth(){ return {trips:[],tollInvAmt:'',parking:[],fne:[],others:[]}; }
-const MONTH_LISTS=['trips','parking','fne','others'];
+function blankMonth(){ return {trips:[],tollItems:[],tollInvAmt:'',parking:[],fne:[],others:[]}; }
+const MONTH_LISTS=['trips','tollItems','parking','fne','others'];
 
 /* Realtime Database does not store empty arrays, and it hands a sparse array
    back as an object keyed by index. Either way a month can come back from the
@@ -806,7 +808,7 @@ const sumBy=(a,f)=>asArray(a).reduce((s,x)=>s+num(f(x)),0);
 function totals(){
   const m=M(), rate=num(S.profile.rate)||0.40;
   const km   = sumBy(m.trips, tripKm);
-  const toll = sumBy(m.trips, tollOf);
+  const toll = sumBy(m.trips, tollOf) + sumBy(m.tollItems, r=>r.amount);
   const park = sumBy(m.parking, r=>r.amount);
   const fne  = sumBy(m.fne,     r=>r.amount);
   const oth  = sumBy(m.others,  r=>r.amount);
@@ -1222,55 +1224,86 @@ function tngGroups(rows){
     trip: trips.find(t=>t.date===date) || null
   }));
 }
+/* The statement mixes business and personal crossings, and a claimable
+   company-vehicle crossing may have no mileage trip behind it. Neither the
+   date nor the match status can decide that — only the salesman can — so
+   every crossing is ticked individually and nothing is claimed by default
+   that they haven't looked at. */
 function openTngReview(rows, note){
-  window._tng = tngGroups(rows);
-  const matched = window._tng.filter(g=>g.trip).length;
-  const grand = window._tng.reduce((s,g)=>s+g.total,0);
+  const groups = tngGroups(rows);
+  groups.forEach(g=>g.rows.forEach(r=>{ r.take = !!g.trip; }));  // matched pre-ticked, rest off
+  window._tng = groups;
   openSheet(`
     <h3>Toll crossings<button onclick="cancelReview()">×</button></h3>
     ${note?`<div class="roflag" style="display:block">${esc(note)}</div>`:''}
-    <div class="tot"><span>${rows.length} crossing${rows.length>1?'s':''} read</span>
-      <span class="n">${rm(grand)}</span></div>
-    <div class="hint" style="margin-bottom:10px">${matched} of ${window._tng.length} day(s)
-      match a trip you recorded. Matched days get their exact charge; the rest need a
-      trip on that date before they can be claimed.</div>
+    <div class="tot"><span>Claiming</span><span class="n" id="tngSum">RM 0.00</span></div>
+    <div class="hint" style="margin-bottom:8px">Tick only the crossings you are claiming.
+      Personal journeys should stay unticked. A crossing with no mileage trip can still be
+      claimed if it was the company vehicle.</div>
+    <div class="btns" style="margin-bottom:10px">
+      <button class="btn sec sm" style="flex:1" onclick="tngAll(true)">Tick all</button>
+      <button class="btn gry sm" style="flex:1" onclick="tngAll(false)">Untick all</button>
+    </div>
     <div id="tngRows"></div>
     <div class="btns" style="margin-top:6px">
       <button class="btn gry" onclick="cancelReview()">Cancel</button>
-      <button class="btn" onclick="applyTng()">Apply to trips</button>
+      <button class="btn" onclick="applyTng()">Add to claim</button>
     </div>
-    <div class="hint" style="margin-top:10px">Reloads and top-ups are ignored —
-      only actual toll crossings are claimed. The photo is deleted when you apply.</div>`);
+    <div class="hint" style="margin-top:10px">Reloads and card top-ups are never listed.
+      The photo is deleted once you add these.</div>`);
   drawTng();
 }
 function drawTng(){
   const box=$('#tngRows'); if(!box) return;
-  box.innerHTML=window._tng.map(g=>`
-    <div class="item" style="${g.trip?'':'border-color:#f0c9a0;background:#fffdf8'}">
-      <div class="top">
-        <div class="g">
-          <div class="t1">${esc(dayLabel(g.date))}</div>
-          ${g.rows.map(r=>`<div class="t2">${esc(r.entry)} → ${esc(r.exit)} · ${rm(r.amount)}${r.confident?'':' <b style="color:var(--warn)">⚠ check</b>'}</div>`).join('')}
-          <div class="t2" style="margin-top:4px">${g.trip
-            ? '<span class="tag">MATCHED</span>'+esc(g.trip.area||'')+' — '+esc(g.trip.tollFrom||'?')+' → '+esc(g.trip.tollTo||'?')
-            : '<b style="color:var(--warn)">No toll trip recorded on this date</b>'}</div>
-        </div>
-        <div class="amt">${rm(g.total)}</div>
-      </div>
+  box.innerHTML=window._tng.map((g,gi)=>`
+    <div class="item">
+      <div class="t1">${esc(dayLabel(g.date))}
+        <span class="t2" style="font-weight:400">— ${g.trip
+          ? '<span class="tag">TRIP</span>'+esc(g.trip.area||'')
+          : '<b style="color:var(--warn)">no mileage trip</b>'}</span></div>
+      ${g.rows.map((r,ri)=>`
+        <label class="chk" style="margin:8px 0 0">
+          <input type="checkbox" ${r.take?'checked':''} onchange="tngTick(${gi},${ri},this.checked)">
+          <span style="flex:1;font-size:13px;font-weight:400">
+            ${esc(r.entry)} → ${esc(r.exit)}
+            ${r.confident?'':'<b style="color:var(--warn)"> ⚠ check</b>'}</span>
+          <b style="font-variant-numeric:tabular-nums">${rm(r.amount)}</b>
+        </label>`).join('')}
     </div>`).join('');
+  tngTotal();
+}
+function tngTick(gi,ri,v){ window._tng[gi].rows[ri].take=v; tngTotal(); }
+function tngAll(v){ window._tng.forEach(g=>g.rows.forEach(r=>r.take=v)); drawTng(); }
+function tngTotal(){
+  const el=$('#tngSum'); if(!el) return;
+  let s=0; window._tng.forEach(g=>g.rows.forEach(r=>{ if(r.take) s+=Number(r.amount)||0; }));
+  el.textContent=rm(s);
 }
 function applyTng(){
   const m=M();
-  let applied=0, skipped=0;
+  let onTrips=0, standalone=0;
+  m.tollItems = asArray(m.tollItems);
   window._tng.forEach(g=>{
-    if(!g.trip){ skipped++; return; }
-    const t=m.trips.find(x=>x.id===g.trip.id);
-    if(t){ t.tollActual=g.total; applied++; }
+    const take=g.rows.filter(r=>r.take);
+    if(!take.length) return;
+    const sum=take.reduce((s,r)=>s+Number(r.amount||0),0);
+    const trip=g.trip && m.trips.find(x=>x.id===g.trip.id);
+    if(trip){ trip.tollActual=sum; onTrips++; return; }
+    /* No mileage trip behind it — claim it in its own right (company vehicle). */
+    const desc='Toll '+(take[0].entry||'?')+' to '+(take[0].exit||'?')
+             + (take.length>1 ? ' (+'+(take.length-1)+' more crossing'+(take.length>2?'s':'')+')' : '');
+    m.tollItems.push({ id:uid(), date:g.date, desc, amount:sum });
+    standalone++;
   });
-  /* The statement total is the natural cross-check figure for the toll box. */
-  m.tollInvAmt = String(window._tng.reduce((s,g)=>s+g.total,0).toFixed(2));
   dropShots(); save(); closeSheet(); renderAll();
-  toast(applied+' day(s) updated'+(skipped?', '+skipped+' had no matching trip':''));
+  const bits=[];
+  if(onTrips)    bits.push(onTrips+' trip'+(onTrips>1?'s':'')+' updated');
+  if(standalone) bits.push(standalone+' toll item'+(standalone>1?'s':'')+' added');
+  toast(bits.length?bits.join(', '):'Nothing ticked — nothing claimed');
+}
+function delTollItem(id){
+  const m=M(); m.tollItems=asArray(m.tollItems).filter(x=>x.id!==id);
+  save(); renderAll();
 }
 
 const ODO_SCHEMA = {
@@ -1419,6 +1452,24 @@ function renderToll(){
         </div>
       </div>`).join('');
 
+  /* Toll claimed on the company vehicle with no outstation trip behind it. */
+  const solo=[...asArray(m.tollItems)].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  $('#tollItems').innerHTML = !solo.length ? '' : `
+    <div class="card">
+      <h2>Toll without a mileage trip</h2>
+      ${solo.map(r=>`
+        <div class="item">
+          <div class="top">
+            <div class="g">
+              <div class="t1">${esc(dayLabel(r.date))}</div>
+              <div class="t2">${esc(r.desc)}</div>
+            </div>
+            <div class="amt">${rm(r.amount)}</div>
+          </div>
+          <div class="iacts"><button class="d" onclick="delTollItem('${r.id}')">🗑 Remove</button></div>
+        </div>`).join('')}
+      <div class="hint">Company vehicle, no outstation trip recorded for that date.</div>
+    </div>`;
   $('#tollInvAmt').value = m.tollInvAmt ?? '';
   const inv=num(m.tollInvAmt), diff=inv-t.toll;
   $('#tollCheck').innerHTML = !inv ? ''
@@ -1545,10 +1596,13 @@ function claimFormPage(){
   const name=S.profile.name||'', mon=monthLabel(S.cur);
 
   const tollTrips=m.trips.filter(x=>x.toll).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  const tollItems=fitLines(tollTrips.map(x=>({
-    date:x.date,
-    desc:`${x.tollFrom||'?'} - ${x.tollTo||'?'} (${num(x.tollWay)===2?'2 way':'1 way'})`,
-    amount:tollOf(x)})),4);
+  const tollItems=fitLines([
+    ...tollTrips.map(x=>({
+      date:x.date,
+      desc:`${x.tollFrom||'?'} - ${x.tollTo||'?'} (${num(x.tollWay)===2?'2 way':'1 way'})`,
+      amount:tollOf(x)})),
+    ...asArray(m.tollItems).map(r=>({date:r.date, desc:r.desc, amount:num(r.amount)}))
+  ].sort((a,b)=>(a.date||'').localeCompare(b.date||'')),4);
   const parkItems=fitLines([...m.parking].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
     .map(r=>({date:r.date,desc:r.desc,amount:num(r.amount)})),4);
   const fneItems =fitLines([...m.fne].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
